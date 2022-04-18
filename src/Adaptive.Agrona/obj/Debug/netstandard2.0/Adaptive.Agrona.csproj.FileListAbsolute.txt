@@ -1,0 +1,12 @@
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\bin\Debug\netstandard2.0\Adaptive.Agrona.deps.json
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\bin\Debug\netstandard2.0\Adaptive.Agrona.dll
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\bin\Debug\netstandard2.0\Adaptive.Agrona.pdb
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\bin\Debug\netstandard2.0\Adaptive.Agrona.xml
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.GeneratedMSBuildEditorConfig.editorconfig
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.AssemblyInfoInputs.cache
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.AssemblyInfo.cs
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.csproj.CoreCompileInputs.cache
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.csproj.Fody.CopyLocal.cache
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.dll
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.xml
+C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona\obj\Debug\netstandard2.0\Adaptive.Agrona.pdb

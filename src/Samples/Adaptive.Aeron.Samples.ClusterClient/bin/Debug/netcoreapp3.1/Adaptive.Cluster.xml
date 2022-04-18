@@ -1,0 +1,2634 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Adaptive.Cluster</name>
+    </assembly>
+    <members>
+        <member name="T:Adaptive.Cluster.Client.AeronCluster">
+             <summary>
+             Client for interacting with an Aeron Cluster.
+             
+             A client will attempt to open a session and then offer ingress messages which are replicated to clustered services
+             for reliability. If the clustered service responds then response messages and events are sent via the egress stream.
+            
+             Note: Instances of this class are not threadsafe.
+             
+             </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.SESSION_HEADER_LENGTH">
+            <summary>
+            Length of a session message header for cluster ingress or egress.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Connect">
+            <summary>
+            Connect to the cluster using default configuration.
+            </summary>
+            <returns> allocated cluster client if the connection is successful. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Connect(Adaptive.Cluster.Client.AeronCluster.Context)">
+            <summary>
+            Connect to the cluster providing <seealso cref="T:Adaptive.Aeron.Aeron.Context"/> for configuration.
+            </summary>
+            <param name="ctx"> for configuration. </param>
+            <returns> allocated cluster client if the connection is successful. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.ConnectAsync">
+            <summary>
+            Begin an attempt at creating a connection which can be completed by calling <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.AsyncConnect.Poll"/> until
+            it returns the client, before complete it will return null.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Client.AeronCluster.AsyncConnect"/> that can be polled for completion. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.ConnectAsync(Adaptive.Cluster.Client.AeronCluster.Context)">
+            <summary>
+            Begin an attempt at creating a connection which can be completed by calling <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.AsyncConnect.Poll"/> until
+            it returns the client, before complete it will return null.
+            </summary>
+            <param name="ctx"> for the cluster. </param>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Client.AeronCluster.AsyncConnect"/> that can be polled for completion. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Dispose">
+            <summary>
+            Close session and release associated resources.
+            </summary>
+        </member>
+        <member name="P:Adaptive.Cluster.Client.AeronCluster.Closed">
+            <summary>
+            Is the client closed? The client can be closed by calling <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Dispose"/> or the cluster sending an event.
+            </summary>
+            <returns> true if closed otherwise false. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Client.AeronCluster.Ctx">
+            <summary>
+            Get the context used to launch this cluster client.
+            </summary>
+            <returns> the context used to launch this cluster client. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Client.AeronCluster.ClusterSessionId">
+            <summary>
+            Cluster session id for the session that was opened as the result of a successful connect.
+            </summary>
+            <returns> session id for the session that was opened as the result of a successful connect. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Client.AeronCluster.LeadershipTermId">
+            <summary>
+            Leadership term identity for the cluster. Advances with changing leadership.
+            </summary>
+            <returns> leadership term identity for the cluster. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Client.AeronCluster.LeaderMemberId">
+            <summary>
+            Get the current leader member id for the cluster.
+            </summary>
+            <returns> the current leader member id for the cluster. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Client.AeronCluster.IngressPublication">
+            <summary>
+            Get the raw <seealso cref="T:Adaptive.Aeron.Publication"/> for sending to the cluster.
+            <para>
+            This can be wrapped with a <seealso cref="T:Adaptive.Cluster.Client.IngressSessionDecorator"/> for pre-pending the cluster session header to
+            messages.
+            <seealso cref="T:Adaptive.Cluster.Codecs.SessionMessageHeaderEncoder"/> should be used for raw access.
+            
+            </para>
+            </summary>
+            <returns> the raw <seealso cref="T:Adaptive.Aeron.Publication"/> for connecting to the cluster. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Client.AeronCluster.EgressSubscription">
+             <summary>
+             Get the raw <seealso cref="T:Adaptive.Aeron.Subscription"/> for receiving from the cluster.
+            
+             this can be wrapped with a <seealso cref="T:Adaptive.Cluster.Client.EgressAdapter"/> for dispatching events from the cluster.
+             <see cref="T:Adaptive.Cluster.Codecs.SessionMessageHeaderDecoder"/> should be used for raw access.
+             
+             </summary>
+             <returns> the raw <seealso cref="T:Adaptive.Aeron.Subscription"/> for receiving from the cluster. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)">
+            <summary>
+            Try to claim a range in the publication log into which a message can be written with zero copy semantics.
+            Once the message has been written then <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Commit"/> should be called thus making it available.
+            <para>
+            On successful claim, the Cluster ingress header will be written to the start of the claimed buffer section.
+            Clients <b>MUST</b> write into the claimed buffer region at offset + <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.SESSION_HEADER_LENGTH"/>.
+            <pre>{@code
+                final IDirectBuffer srcBuffer = AcquireMessage();
+               
+                if (aeronCluster.TryClaim(length, bufferClaim) > 0L)
+                {
+                    try
+                    {
+                         final IMutableDirectBuffer buffer = bufferClaim.Buffer;
+                         final int offset = bufferClaim.Offset;
+                         // ensure that data is written at the correct offset
+                         buffer.PutBytes(offset + AeronCluster.SESSION_HEADER_LENGTH, srcBuffer, 0, length);
+                    }
+                    finally
+                    {
+                        bufferClaim.Commit();
+                    }
+                }
+            }</pre>
+               
+            </para>
+            </summary>
+            <param name="length">      of the range to claim, in bytes. The additional bytes for the session header will be added. </param>
+            <param name="bufferClaim"> to be populated if the claim succeeds. </param>
+            <returns> The new stream position, otherwise a negative error value as specified in
+            <seealso cref="M:Adaptive.Aeron.Publication.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)"/>. </returns>
+            <exception cref="T:System.ArgumentException"> if the length is greater than <seealso cref="P:Adaptive.Aeron.Publication.MaxPayloadLength"/>. </exception>
+            <seealso cref="M:Adaptive.Aeron.Publication.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)"/>
+            <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Commit"/>
+            <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Abort"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Offer(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32)">
+            <summary>
+            Non-blocking publish of a partial buffer containing a message plus session header to a cluster.
+            <para>
+            This version of the method will set the timestamp value in the header to zero.
+                
+            </para>
+            </summary>
+            <param name="buffer">        containing message. </param>
+            <param name="offset">        offset in the buffer at which the encoded message begins. </param>
+            <param name="length">        in bytes of the encoded message. </param>
+            <returns> the same as <seealso cref="M:Adaptive.Aeron.Publication.Offer(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.ReservedValueSupplier)"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Offer(Adaptive.Aeron.DirectBufferVector[])">
+            <summary>
+            Non-blocking publish by gathering buffer vectors into a message. The first vector will be replaced by the cluster
+            session message header so must be left unused.
+            </summary>
+            <param name="vectors"> which make up the message. </param>
+            <returns> the same as <seealso cref="M:Adaptive.Aeron.Publication.Offer(Adaptive.Aeron.DirectBufferVector[],Adaptive.Aeron.ReservedValueSupplier)"/>. </returns>
+            <seealso cref="M:Adaptive.Aeron.Publication.Offer(Adaptive.Aeron.DirectBufferVector[],Adaptive.Aeron.ReservedValueSupplier)"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.SendKeepAlive">
+             <summary>
+             Send a keep alive message to the cluster to keep this session open.
+            
+             Note: Sending keep-alives can fail during a leadership transition. The application should continue to call
+             <see cref="M:Adaptive.Cluster.Client.AeronCluster.PollEgress"/> to ensure a connection to the new leader is established.
+             
+             </summary>
+             <returns> true if successfully sent otherwise false if back pressured. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.PollEgress">
+            <summary>
+            Poll the <seealso cref="P:Adaptive.Cluster.Client.AeronCluster.EgressSubscription"/> for session messages which are dispatched to
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressListener"/>.
+            <para>
+            <b>Note:</b> if <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressListener"/> is not set then a <seealso cref="T:Adaptive.Aeron.Exceptions.ConfigurationException"/> could result.
+               
+            </para>
+            </summary>
+            <returns> the number of fragments processed. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.ControlledPollEgress">
+            <summary>
+            Poll the <seealso cref="P:Adaptive.Cluster.Client.AeronCluster.EgressSubscription"/> for session messages which are dispatched to
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.ControlledEgressListener"/>.
+            <para>
+            <b>Note:</b> if <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.ControlledEgressListener"/> is not set then a <seealso cref="T:Adaptive.Aeron.Exceptions.ConfigurationException"/>
+            could result.
+               
+            </para>
+            </summary>
+            <returns> the number of fragments processed. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.OnNewLeader(System.Int64,System.Int64,System.Int32,System.String)">
+            <summary>
+            To be called when a new leader event is delivered. This method needs to be called when using the
+            <seealso cref="T:Adaptive.Cluster.Client.EgressAdapter"/> or <seealso cref="T:Adaptive.Cluster.Client.EgressPoller"/> rather than <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.PollEgress"/> method.
+            </summary>
+            <param name="clusterSessionId"> which must match <seealso cref="P:Adaptive.Cluster.Client.AeronCluster.ClusterSessionId"/>. </param>
+            <param name="leadershipTermId"> that identifies the term for which the new leader has been elected.</param>
+            <param name="leaderMemberId">   which has become the new leader. </param>
+            <param name="ingressEndpoints">  comma separated list of cluster ingress endpoints to connect to with the leader first. </param>
+        </member>
+        <member name="T:Adaptive.Cluster.Client.AeronCluster.Configuration">
+            <summary>
+            Configuration options for cluster client.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.PROTOCOL_MAJOR_VERSION">
+            <summary>
+            Major version of the network protocol from client to consensus module. If these don't match then client
+            and archive consensus module are not compatible.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.PROTOCOL_MINOR_VERSION">
+            <summary>
+            Minor version of the network protocol from client to consensus module. If these don't match then some
+            features may not be available.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.PROTOCOL_PATCH_VERSION">
+            <summary>
+            Patch version of the network protocol from client to consensus module. If these don't match then bug fixes
+            may not have been applied.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.PROTOCOL_SEMANTIC_VERSION">
+            <summary>
+            Combined semantic version for the client to consensus module protocol.
+            </summary>
+            <seealso cref="T:Adaptive.Agrona.SemanticVersion"/>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.MESSAGE_TIMEOUT_PROP_NAME">
+            <summary>
+            Timeout when waiting on a message to be sent or received.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.MESSAGE_TIMEOUT_DEFAULT_NS">
+            <summary>
+            Default timeout when waiting on a message to be sent or received.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_PROP_NAME">
+             <summary>
+             Property name for the comma separated list of cluster ingress endpoints for use with unicast. This is the
+             endpoint values which get substituted into the <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_PROP_NAME"/> when using UDP unicast.
+            
+             <code>0=endpoint,1=endpoint,2=endpoint</code>
+             
+             Each member of the list will be substituted for the endpoint in the <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_PROP_NAME"/> value.
+             
+             </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_DEFAULT">
+            <summary>
+            Default comma separated list of cluster ingress endpoints.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_PROP_NAME">
+            <summary>
+            Channel for sending messages to a cluster. Ideally this will be a multicast address otherwise unicast will
+            be required and the <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_PROP_NAME"/> is used to substitute the endpoints from
+            the <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_PROP_NAME"/> list.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_DEFAULT">
+            <summary>
+            Channel for sending messages to a cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for sending messages to a cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_DEFAULT">
+            <summary>
+            Default stream id within a channel for sending messages to a cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_PROP_NAME">
+            <summary>
+            Channel for receiving response messages from a cluster.
+            
+            <para>
+            Channel's <em>endpoint</em> can be specified explicitly (i.e. by providing address and port pair) or
+            by using zero as a port number. Here is an example of valid response channels:
+            <ul>
+                <li>{@code aeron:udp?endpoint=localhost:9020} - listen on port {@code 9020} on localhost.</li>
+                <li>{@code aeron:udp?endpoint=192.168.10.10:9020} - listen on port {@code 9020} on
+                {@code 192.168.10.10}.</li>
+                <li>{@code aeron:udp?endpoint=localhost:0} - in this case the port is unspecified and the OS
+                will assign a free port from the
+                <a href="https://en.wikipedia.org/wiki/Ephemeral_port">ephemeral port range</a>.</li>
+            </ul>
+            </para>
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_DEFAULT">
+            <summary>
+            Channel for receiving response messages from a cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for receiving messages from a cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_DEFAULT">
+            <summary>
+            Default stream id within a channel for receiving messages from a cluster.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Configuration.MessageTimeoutNs">
+            <summary>
+            The timeout in nanoseconds to wait for a message.
+            </summary>
+            <returns> timeout in nanoseconds to wait for a message. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.MESSAGE_TIMEOUT_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Configuration.IngressEndpoints">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Configuration.IngressChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Configuration.IngressStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Configuration.EgressChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Configuration.EgressStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Client.AeronCluster.Context">
+            <summary>
+            Context for cluster session and connection.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.Clone">
+            <summary>
+            Perform a shallow copy of the object.
+            </summary>
+            <returns> a shall copy of the object.</returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.Conclude">
+            <summary>
+            Conclude configuration by setting up defaults when specifics are not provided.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.MessageTimeoutNs(System.Int64)">
+            <summary>
+            Set the message timeout in nanoseconds to wait for sending or receiving a message.
+            </summary>
+            <param name="messageTimeoutNs"> to wait for sending or receiving a message. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.MESSAGE_TIMEOUT_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.MessageTimeoutNs">
+            <summary>
+            The message timeout in nanoseconds to wait for sending or receiving a message.
+            </summary>
+            <returns> the message timeout in nanoseconds to wait for sending or receiving a message. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.MESSAGE_TIMEOUT_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressEndpoints(System.String)">
+            <summary>
+            The endpoints representing members for use with unicast to be substituted into the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressChannel"/>
+            for endpoints. A null value can be used when multicast where the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressChannel"/> contains the
+            multicast endpoint.
+            </summary>
+            <param name="clusterMembers"> which are all candidates to be leader. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressEndpoints">
+            <summary>
+            The endpoints representing members for use with unicast to be substituted into the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressChannel"/>
+            for endpoints. A null value can be used when multicast where the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressChannel"/> contains the
+            multicast endpoint.
+            </summary>
+            <returns> members of the cluster which are all candidates to be leader. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_ENDPOINTS_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressChannel(System.String)">
+            <summary>
+            Set the channel parameter for the ingress channel.
+            <para>
+            The endpoints representing members for use with unicast are substituted from the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressEndpoints"/>
+            for endpoints. If this channel contains a multicast endpoint, then <see cref="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressEndpoints"/> should
+            be set to null. 
+                    
+            </para>
+            </summary>
+            <param name="channel"> parameter for the ingress channel. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressChannel">
+             <summary>
+             Set the channel parameter for the ingress channel.
+            
+             The endpoints representing members for use with unicast are substituted from the
+             <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressEndpoints"/> for endpoints. A null value can be used when multicast
+             where this contains the multicast endpoint.
+                    
+             </summary>
+             <returns> the channel parameter for the ingress channel. </returns>
+             <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressStreamId(System.Int32)">
+            <summary>
+            Set the stream id for the ingress channel.
+            </summary>
+            <param name="streamId"> for the ingress channel. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IngressStreamId">
+            <summary>
+            Get the stream id for the ingress channel.
+            </summary>
+            <returns> the stream id for the ingress channel. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.INGRESS_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressChannel(System.String)">
+            <summary>
+            Set the channel parameter for the egress channel.
+            </summary>
+            <param name="channel"> parameter for the egress channel. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressChannel">
+            <summary>
+            Get the channel parameter for the egress channel.
+            </summary>
+            <returns> the channel parameter for the egress channel. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressStreamId(System.Int32)">
+            <summary>
+            Set the stream id for the egress channel.
+            </summary>
+            <param name="streamId"> for the egress channel. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressStreamId">
+            <summary>
+            Get the stream id for the egress channel.
+            </summary>
+            <returns> the stream id for the egress channel. </returns>
+            <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.Configuration.EGRESS_STREAM_ID_PROP_NAME"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IdleStrategy(Adaptive.Agrona.Concurrent.IIdleStrategy)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> used when waiting for responses.
+            </summary>
+            <param name="idleStrategy"> used when waiting for responses. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IdleStrategy">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> used when waiting for responses.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> used when waiting for responses. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.AeronDirectoryName(System.String)">
+            <summary>
+            Set the top level Aeron directory used for communication between the Aeron client and Media Driver.
+            </summary>
+            <param name="aeronDirectoryName"> the top level Aeron directory. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.AeronDirectoryName">
+            <summary>
+            Get the top level Aeron directory used for communication between the Aeron client and Media Driver.
+            </summary>
+            <returns> The top level Aeron directory. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.Aeron(Adaptive.Aeron.Aeron)">
+            <summary>
+            <seealso cref="T:Adaptive.Aeron.Aeron"/> client for communicating with the local Media Driver.
+            <para>
+            This client will be closed when the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Dispose"/> or <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.Dispose"/> methods are called if
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.OwnsAeronClient"/> is true.
+            
+            </para>
+            </summary>
+            <param name="aeron"> client for communicating with the local Media Driver. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="M:Adaptive.Aeron.Aeron.Connect"/>.
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.Aeron">
+            <summary>
+            <seealso cref="T:Adaptive.Aeron.Aeron"/> client for communicating with the local Media Driver.
+            <para>
+            If not provided then a default will be established during <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.Conclude"/> by calling
+            <seealso cref="M:Adaptive.Aeron.Aeron.Connect"/>.
+            
+            </para>
+            </summary>
+            <returns> client for communicating with the local Media Driver. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.OwnsAeronClient(System.Boolean)">
+            <summary>
+            Does this context own the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.Aeron"/> client and this takes responsibility for closing it?
+            </summary>
+            <param name="ownsAeronClient"> does this context own the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.Aeron"/> client. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.OwnsAeronClient">
+            <summary>
+            Does this context own the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.Aeron"/> client and this takes responsibility for closing it?
+            </summary>
+            <returns> does this context own the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.Aeron"/> client and this takes responsibility for closing it? </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IsIngressExclusive(System.Boolean)">
+            <summary>
+            Is ingress to the cluster exclusively from a single thread to this client? The client should not be used
+            from another thread, e.g. a separate thread calling <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.SendKeepAlive"/> - which is awful
+            design by the way!
+            </summary>
+            <param name="isIngressExclusive"> true if ingress to the cluster is exclusively from a single thread for this client? </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IsIngressExclusive">
+            <summary>
+            Is ingress the <seealso cref="T:Adaptive.Aeron.Publication"/> to the cluster used exclusively from a single thread to this client?
+            </summary>
+            <returns> true if the ingress <seealso cref="T:Adaptive.Aeron.Publication"/> is to be used exclusively from a single thread? </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.CredentialsSupplier">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Aeron.Security.ICredentialsSupplier"/> to be used for authentication with the cluster.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Aeron.Security.ICredentialsSupplier"/> to be used for authentication with the cluster. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.CredentialsSupplier(Adaptive.Aeron.Security.ICredentialsSupplier)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Aeron.Security.ICredentialsSupplier"/> to be used for authentication with the cluster.
+            </summary>
+            <param name="credentialsSupplier"> to be used for authentication with the cluster. </param>
+            <returns> this for fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.ErrorHandler">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Agrona.ErrorHandler"/> to be used for handling any exceptions.
+            </summary>
+            <returns> The <seealso cref="T:Adaptive.Agrona.ErrorHandler"/> to be used for handling any exceptions. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.ErrorHandler(Adaptive.Agrona.ErrorHandler)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.ErrorHandler"/> to be used for handling any exceptions.
+            </summary>
+            <param name="errorHandler"> Method to handle objects of type Throwable. </param>
+            <returns> this for fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IsDirectAssemblers">
+            <summary>
+            Is direct buffers used for fragment assembly on egress.
+            </summary>
+            <returns> true if direct buffers used for fragment assembly on egress. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.IsDirectAssemblers(System.Boolean)">
+            <summary>
+            Is direct buffers used for fragment assembly on egress.
+            </summary>
+            <param name="isDirectAssemblers"> true if direct buffers used for fragment assembly on egress. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressListener">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Cluster.Client.IEgressListener"/> function that will be called when polling for egress via
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.PollEgress"/>.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Client.IEgressListener"/> function that will be called when polling for egress via
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.PollEgress"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.EgressListener(Adaptive.Cluster.Client.IEgressListener)">
+             <summary>
+             Get the <seealso cref="T:Adaptive.Cluster.Client.IEgressListener"/> function that will be called when polling for egress via
+             <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.PollEgress"/>.
+            
+             Only <see cref="M:Adaptive.Cluster.Client.IEgressListener.OnMessage(System.Int64,System.Int64,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)"/> will be dispatched
+             when using <see cref="M:Adaptive.Cluster.Client.AeronCluster.PollEgress"/>
+             
+             </summary>
+             <param name="listener"> function that will be called when polling for egress via <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.PollEgress"/>. </param>
+             <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.ControlledEgressListener">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Cluster.Client.IControlledEgressListener"/> function that will be called when polling for egress via
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.ControlledPollEgress"/>.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Client.IControlledEgressListener"/> function that will be called when polling for egress via
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.ControlledPollEgress"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.ControlledEgressListener(Adaptive.Cluster.Client.IControlledEgressListener)">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Cluster.Client.IControlledEgressListener"/> function that will be called when polling for egress via
+            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.ControlledPollEgress"/>.
+            
+            Only <seealso cref="M:Adaptive.Cluster.Client.IControlledEgressListener.OnMessage(System.Int64,System.Int64,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)"/> will be
+            dispatched when using <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.ControlledPollEgress"/>.
+            </summary>
+            <param name="listener"> function that will be called when polling for egress via
+                            <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.ControlledPollEgress"/>. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.Context.Dispose">
+            <summary>
+            Close the context and free applicable resources.
+            <para>
+            If <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.OwnsAeronClient"/> is true then the <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.Context.Aeron"/> client will be closed.
+            </para>
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Client.AeronCluster.AsyncConnect">
+            <summary>
+            Allows for the async establishment of a cluster session. <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.AsyncConnect.Poll"/> should be called repeatedly until
+            it returns a non-null value with the new <seealso cref="T:Adaptive.Cluster.Client.AeronCluster"/> client. On error <seealso cref="M:Adaptive.Cluster.Client.AeronCluster.AsyncConnect.Dispose"/> should be called
+            to clean up allocated resources.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.AsyncConnect.Dispose">
+            <summary>
+            Close allocated resources. Must be called on error. On success this is a no op.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.AsyncConnect.Step">
+            <summary>
+            Indicates which step in the connect process has been reached.
+            </summary>
+            <returns> which step in the connect process has been reached. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.AeronCluster.AsyncConnect.Poll">
+            <summary>
+            Poll to advance steps in the connection until complete or error.
+            </summary>
+            <returns> null if not yet complete then <seealso cref="T:Adaptive.Cluster.Client.AeronCluster"/> when complete. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Client.ClusterException">
+            <summary>
+            Exceptions specific to Cluster operation. 
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.ClusterException.#ctor(System.String)">
+            <summary>
+            Cluster exception with provided message and <seealso cref="F:Adaptive.Aeron.Exceptions.Category.ERROR"/>.
+            </summary>
+            <param name="message"> to detail the exception. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.ClusterException.#ctor(System.String,Adaptive.Aeron.Exceptions.Category)">
+            <summary>
+            Cluster exception with a detailed message and provided <seealso cref="T:Adaptive.Aeron.Exceptions.Category"/>.
+            </summary>
+            <param name="message">  providing detail on the error. </param>
+            <param name="category"> of the exception. </param>
+        </member>
+        <member name="T:Adaptive.Cluster.Client.EgressAdapter">
+            <summary>
+            Adapter for dispatching egress messages from a cluster to a <seealso cref="T:Adaptive.Cluster.Client.IEgressListener"/>.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressAdapter.#ctor(Adaptive.Cluster.Client.IEgressListener,System.Int64,Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Construct an adapter for cluster egress which consumes from the subscription and dispatches to the
+            <seealso cref="T:Adaptive.Cluster.Client.IEgressListener"/>.
+            </summary>
+            <param name="listener">         to dispatch events to. </param>
+            <param name="clusterSessionId"> for the egress. </param>
+            <param name="subscription">     over the egress stream. </param>
+            <param name="fragmentLimit">    to poll on each <seealso cref="M:Adaptive.Cluster.Client.EgressAdapter.Poll"/> operation. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressAdapter.Poll">
+            <summary>
+            Poll the egress subscription and dispatch assembled events to the <seealso cref="T:Adaptive.Cluster.Client.IEgressListener"/>.
+            </summary>
+            <returns> the number of fragments consumed. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressAdapter.OnFragment(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)">
+            <inheritdoc />
+        </member>
+        <member name="T:Adaptive.Cluster.Client.EgressPoller">
+            <summary>
+            Poller for the egress from a cluster to capture administration message details.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.#ctor(Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Construct a poller on the egress subscription.
+            </summary>
+            <param name="subscription">  for egress from the cluster. </param>
+            <param name="fragmentLimit"> for each poll operation. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.Subscription">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Cluster.Client.EgressPoller.Subscription"/> used for polling events.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Cluster.Client.EgressPoller.Subscription"/> used for polling events. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.TemplateId">
+            <summary>
+            Get the template id of the last received event.
+            </summary>
+            <returns> the template id of the last received event. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.ClusterSessionId">
+            <summary>
+            Cluster session id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> cluster session id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if not returned. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.CorrelationId">
+            <summary>
+            Correlation id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> correlation id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if not returned. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.LeadershipTermId">
+            <summary>
+            Leadership term id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> leadership term id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if not returned. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.LeaderMemberId">
+            <summary>
+            Leader cluster member id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> leader cluster member id of the last polled event or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.EventCode">
+            <summary>
+            Get the event code returned from the last session event.
+            </summary>
+            <returns> the event code returned from the last session event. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.Version">
+            <summary>
+            Version response from the server in semantic version form.
+            </summary>
+            <returns> response from the server in semantic version form. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.Detail">
+            <summary>
+            Get the detail returned from the last session event.
+            </summary>
+            <returns> the detail returned from the last session event. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.EncodedChallenge">
+            <summary>
+            Get the challenge data in the last challenge.
+            </summary>
+            <returns> the challenge data in the last challenge or null if last message was not a challenge. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.IsPollComplete">
+            <summary>
+            Has the last polling action received a complete event?
+            </summary>
+            <returns> true if the last polling action received a complete event. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.IsChallenged">
+            <summary>
+            Was last message a challenge or not?
+            </summary>
+            <returns> true if last message was a challenge or false if not. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.Poll">
+            <summary>
+            Reset last captured value and poll the egress subscription for output.
+            </summary>
+            <returns> number of fragments consumed. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.EgressPoller.OnFragment(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)">
+            <inheritdoc />
+        </member>
+        <member name="T:Adaptive.Cluster.Client.IControlledEgressListener">
+            <summary>
+            Interface for consuming messages coming from the cluster that also include administrative events in a controlled
+            fashion like <seealso cref="T:Adaptive.Aeron.LogBuffer.ControlledFragmentHandler"/>. Only session messages may be controlled in
+            consumption, other are consumed via <seealso cref="F:Adaptive.Aeron.LogBuffer.ControlledFragmentHandlerAction.COMMIT"/>.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IControlledEgressListener.OnMessage(System.Int64,System.Int64,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)">
+            <summary>
+            Message event returned from the clustered service.
+            </summary>
+            <param name="clusterSessionId"> to which the message belongs. </param>
+            <param name="timestamp">      at which the correlated ingress was sequenced in the cluster. </param>
+            <param name="buffer">           containing the message. </param>
+            <param name="offset">           at which the message begins. </param>
+            <param name="length">           of the message in bytes. </param>
+            <param name="header">           Aeron header associated with the message fragment. </param>
+            <returns> what action should be taken regarding advancement of the stream.</returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IControlledEgressListener.OnSessionEvent(System.Int64,System.Int64,System.Int64,System.Int32,Adaptive.Cluster.Codecs.EventCode,System.String)">
+            <summary>
+            Session event emitted from the cluster which after connect can indicate an error or session close.
+            </summary>
+            <param name="correlationId">    associated with the cluster ingress. </param>
+            <param name="clusterSessionId"> to which the event belongs. </param>
+            <param name="leadershipTermId"> for identifying the active term of leadership </param>
+            <param name="leaderMemberId">   identity of the active leader. </param>
+            <param name="code">             to indicate the type of event. </param>
+            <param name="detail">           Textual detail to explain the event. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IControlledEgressListener.OnNewLeader(System.Int64,System.Int64,System.Int32,System.String)">
+            <summary>
+            Event indicating a new leader has been elected.
+            </summary>
+            <param name="clusterSessionId"> to which the event belongs. </param>
+            <param name="leadershipTermId"> for identifying the active term of leadership </param>
+            <param name="leaderMemberId">   identity of the active leader. </param>
+            <param name="ingressEndpoints">  for connecting to the cluster which can be updated due to dynamic membership. </param>
+        </member>
+        <member name="T:Adaptive.Cluster.Client.IEgressListener">
+            <summary>
+            Interface for consuming messages coming from the cluster that also include administrative events.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IEgressListener.OnMessage(System.Int64,System.Int64,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)">
+            <summary>
+            Message event returned from the clustered service.
+            </summary>
+            <param name="clusterSessionId"> to which the message belongs. </param>
+            <param name="timestamp">      at which the correlated ingress was sequenced in the cluster. </param>
+            <param name="buffer">           containing the message. </param>
+            <param name="offset">           at which the message begins. </param>
+            <param name="length">           of the message in bytes. </param>
+            <param name="header">           Aeron header associated with the message fragment. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IEgressListener.OnSessionEvent(System.Int64,System.Int64,System.Int64,System.Int32,Adaptive.Cluster.Codecs.EventCode,System.String)">
+            <summary>
+            Session event emitted from the cluster which after connect can indicate an error or session close.
+            </summary>
+            <param name="correlationId">    associated with the cluster ingress. </param>
+            <param name="clusterSessionId"> to which the event belongs. </param>
+            <param name="leadershipTermId"> for identifying the active term of leadership </param>
+            <param name="leaderMemberId">   identity of the active leader. </param>
+            <param name="code">             to indicate the type of event. </param>
+            <param name="detail">           Textual detail to explain the event. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IEgressListener.OnNewLeader(System.Int64,System.Int64,System.Int32,System.String)">
+            <summary>
+            Event indicating a new leader has been elected.
+            </summary>
+            <param name="clusterSessionId"> to which the event belongs. </param>
+            <param name="leadershipTermId"> for identifying the active term of leadership </param>
+            <param name="leaderMemberId">   identity of the active leader. </param>
+            <param name="ingressEndpoints">  for connecting to the cluster which can be updated due to dynamic membership. </param>
+        </member>
+        <member name="T:Adaptive.Cluster.Client.IngressSessionDecorator">
+            <summary>
+            Encapsulate applying a client message header for ingress to the cluster.
+            
+            The client message header is applied by a vectored offer to the <seealso cref="T:Adaptive.Aeron.Publication"/>.
+            
+            <b>Note:</b> This class is NOT threadsafe. Each publisher thread requires its own instance.
+            
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Client.IngressSessionDecorator.HEADER_LENGTH">
+             <summary>
+             Length of the session header that will be prepended to the message.
+            
+             The client message header is applied to the <see cref="T:Adaptive.Aeron.Publication"/> before the offered buffer.
+            
+             Note: This class is NOT threadsafe for updating <see cref="M:Adaptive.Cluster.Client.IngressSessionDecorator.ClusterSessionId(System.Int64)"/> or
+             <see cref="M:Adaptive.Cluster.Client.IngressSessionDecorator.LeadershipTermId(System.Int64)"/>. Each publisher thread requires its own instance.
+             
+             </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IngressSessionDecorator.#ctor">
+            <summary>
+            Construct a new ingress session header wrapper that defaults all fields to the <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IngressSessionDecorator.#ctor(System.Int64,System.Int64)">
+            <summary>
+            Construct a new session header wrapper.
+            </summary>
+            <param name="clusterSessionId"> that has been allocated by the cluster. </param>
+            <param name="leadershipTermId"> of the current leader.</param>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IngressSessionDecorator.ClusterSessionId(System.Int64)">
+            <summary>
+            Reset the cluster session id in the header.
+            </summary>
+            <param name="clusterSessionId"> to be set in the header. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IngressSessionDecorator.LeadershipTermId(System.Int64)">
+            <summary>
+            Reset the leadership term id in the header.
+            </summary>
+            <param name="leadershipTermId"> to be set in the header. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Client.IngressSessionDecorator.Offer(Adaptive.Aeron.Publication,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32)">
+            <summary>
+            Non-blocking publish of a partial buffer containing a message plus session header to a cluster.
+            <para>
+            This version of the method will set the timestamp value in the header to <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>.
+            
+            </para>
+            </summary>
+            <param name="publication">   to be offerec to. </param>
+            <param name="buffer">        containing message. </param>
+            <param name="offset">        offset in the buffer at which the encoded message begins. </param>
+            <param name="length">        in bytes of the encoded message. </param>
+            <returns> the same as <seealso cref="M:Adaptive.Aeron.Publication.Offer(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.ReservedValueSupplier)"/>. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ActiveLogEvent">
+            <summary>
+            Event to signal a change of active log to follow.
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.BoundedLogAdapter">
+            <summary>
+            Adapter for reading a log with a upper bound applied beyond which the consumer cannot progress.
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.IClientSession">
+            <summary>
+            Session representing a connected client to the cluster.
+            </summary>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.IClientSession.Id">
+            <summary>
+            Cluster session identity uniquely allocated when the session was opened.
+            </summary>
+            <returns> the cluster session identity uniquely allocated when the session was opened. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.IClientSession.ResponseStreamId">
+            <summary>
+            The response channel stream id for responding to the client.
+            </summary>
+            <returns> response channel stream id for responding to the client. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.IClientSession.ResponseChannel">
+            <summary>
+            The response channel for responding to the client.
+            </summary>
+            <returns> response channel for responding to the client. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.IClientSession.EncodedPrincipal">
+            <summary>
+            Cluster session encoded principal from when the session was authenticated.
+            </summary>
+            <returns> The encoded Principal passed. May be 0 length to indicate none present. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClientSession.Close">
+            <summary>
+            Close of this <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/> by sending the request to the consensus module.
+            <para>
+            This method is idempotent.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.IClientSession.IsClosing">
+            <summary>
+            Indicates that a request to close this session has been made.
+            </summary>
+            <returns> whether a request to close this session has been made. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClientSession.Offer(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32)">
+            <summary>
+            Non-blocking publish of a partial buffer containing a message to a cluster.
+            </summary>
+            <param name="buffer"> containing message. </param>
+            <param name="offset"> offset in the buffer at which the encoded message begins. </param>
+            <param name="length"> in bytes of the encoded message. </param>
+            <returns> the same as <seealso cref="M:Adaptive.Aeron.Publication.Offer(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.ReservedValueSupplier)"/> when in <seealso cref="F:Adaptive.Cluster.Service.ClusterRole.Leader"/>,
+            otherwise <see cref="F:Adaptive.Cluster.Service.ClientSessionConstants.MOCKED_OFFER"/> when a follower. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClientSession.Offer(Adaptive.Aeron.DirectBufferVector[])">
+            <summary>
+            Non-blocking publish by gathering buffer vectors into a message. The first vector will be replaced by the cluster
+            egress header so must be left unused.
+            </summary>
+            <param name="vectors"> which make up the message. </param>
+            <returns> the same as <seealso cref="M:Adaptive.Aeron.Publication.Offer(Adaptive.Aeron.DirectBufferVector[],Adaptive.Aeron.ReservedValueSupplier)"/>. </returns>
+            <seealso cref="M:Adaptive.Aeron.Publication.Offer(Adaptive.Aeron.DirectBufferVector[],Adaptive.Aeron.ReservedValueSupplier)"/> when in <seealso cref="F:Adaptive.Cluster.Service.ClusterRole.Leader"/>,
+            otherwise <seealso cref="F:Adaptive.Cluster.Service.ClientSessionConstants.MOCKED_OFFER"/> when a follower.
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClientSession.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)">
+            <summary>
+            Try to claim a range in the publication log into which a message can be written with zero copy semantics.
+            Once the message has been written then <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Commit"/> should be called thus making it available.
+            <para>
+            On successful claim, the Cluster egress header will be written to the start of the claimed buffer section.
+            Clients <b>MUST</b> write into the claimed buffer region at offset + <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.SESSION_HEADER_LENGTH"/>.
+            <pre>{@code
+                final IDirectBuffer srcBuffer = AcquireMessage();
+               
+                if (clientSession.TryClaim(length, bufferClaim) > 0L)
+                {
+                    try
+                    {
+                         final IMutableDirectBuffer buffer = bufferClaim.Buffer;
+                         final int offset = bufferClaim.Offset;
+                         // ensure that data is written at the correct offset
+                         buffer.PutBytes(offset + AeronCluster.SESSION_HEADER_LENGTH, srcBuffer, 0, length);
+                    }
+                    finally
+                    {
+                        bufferClaim.Commit();
+                    }
+                }
+            }</pre>
+               
+            </para>
+            </summary>
+            <param name="length">      of the range to claim in bytes. The additional bytes for the session header will be added. </param>
+            <param name="bufferClaim"> to be populated if the claim succeeds. </param>
+            <returns> The new stream position, otherwise a negative error value as specified in
+                    <seealso cref="M:Adaptive.Aeron.Publication.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)"/>.when in <seealso cref="F:Adaptive.Cluster.Service.ClusterRole.Leader"/>,
+                    otherwise <seealso cref="F:Adaptive.Cluster.Service.ClientSessionConstants.MOCKED_OFFER"/> when a follower.</returns>
+            <exception cref="T:System.ArgumentException"> if the length is greater than <seealso cref="P:Adaptive.Aeron.Publication.MaxPayloadLength"/>. </exception>
+            <seealso cref="M:Adaptive.Aeron.Publication.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)"/>
+            <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Commit"/>
+            <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Abort"/>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClientSessionConstants.MOCKED_OFFER">
+            <summary>
+            Return value to indicate egress to a session is mocked out by the cluster when in follower mode.
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ClusterCounters">
+            <summary>
+            For allocating and finding cluster associated counters identified by
+            <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterId"/>.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusterCounters.Find(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32,System.Int32)">
+            <summary>
+            Find the counter id for a type of counter in a cluster.
+            </summary>
+            <param name="counters">  to search within. </param>
+            <param name="typeId">    of the counter. </param>
+            <param name="clusterId"> to which the allocated counter belongs. </param>
+            <returns> the matching counter id or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if not found. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ClusteredServiceContainer">
+            <summary>
+            Container for a service in the cluster managed by the Consensus Module. This is where business logic resides and
+            loaded via <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_CLASS_NAME_PROP_NAME"/> or
+            <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusteredService(Adaptive.Cluster.Service.IClusteredService)"/>.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Main(System.String[])">
+            <summary>
+            Launch the clustered service container and await a shutdown signal.
+            </summary>
+            <param name="args"> command line argument which is a list for properties files as URLs or filenames. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Launch">
+            <summary>
+            Launch an ClusteredServiceContainer using a default configuration.
+            </summary>
+            <returns> a new instance of a ClusteredServiceContainer. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Launch(Adaptive.Cluster.Service.ClusteredServiceContainer.Context)">
+            <summary>
+            Launch a ClusteredServiceContainer by providing a configuration context.
+            </summary>
+            <param name="ctx"> for the configuration parameters. </param>
+            <returns> a new instance of a ClusteredServiceContainer. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Ctx">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer.Context"/> that is used by this <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer.Context"/> that is used by this <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration">
+            <summary>
+            Configuration options for the consensus module and service container within a cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_TYPE_ID">
+            <summary>
+            Type of snapshot for this service.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.MARK_FILE_UPDATE_INTERVAL_NS">
+            <summary>
+            Update interval for cluster mark file.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_PROP_NAME">
+            <summary>
+            Property name for the identity of the cluster instance.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_DEFAULT">
+            <summary>
+            Default identity for a clustered instance.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_PROP_NAME">
+            <summary>
+            Identity for a clustered service. Services should be numbered from 0 and be contiguous.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_DEFAULT">
+            <summary>
+            Default identity for a clustered service.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_PROP_NAME">
+            <summary>
+            Name for a clustered service to be the role of the <seealso cref="T:Adaptive.Agrona.Concurrent.IAgent"/>.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_DEFAULT">
+            <summary>
+            Name for a clustered service to be the role of the <seealso cref="T:Adaptive.Agrona.Concurrent.IAgent"/>.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_CLASS_NAME_PROP_NAME">
+            <summary>
+            Class name for dynamically loading a <seealso cref="T:Adaptive.Cluster.Service.IClusteredService"/>. This is used if
+            <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusteredService"/> is not set.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_PROP_NAME">
+            <summary>
+            Default channel to be used for log or snapshot replay on startup.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_DEFAULT">
+            <summary>
+            Channel to be used for log or snapshot replay on startup.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for the clustered log or snapshot replay.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_DEFAULT">
+            <summary>
+            Default stream id for the log or snapshot replay within a channel.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_PROP_NAME">
+            <summary>
+            Channel for control communications between the local consensus module and services.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_DEFAULT">
+            <summary>
+             Default channel for communications between the local consensus module and services. This should be IPC.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within the control channel for communications from the consensus module to the services.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_DEFAULT">
+            <summary>
+            Default stream id within the control channel for communications from the consensus module to the services.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for communications from the services to the consensus module.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_DEFAULT">
+            <summary>
+            Default stream id within a channel for communications from the services to the consensus module.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_PROP_NAME">
+            <summary>
+            Default channel to be used for archiving snapshots.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_DEFAULT">
+            <summary>
+            Channel to be used for archiving snapshots.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for archiving snapshots.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_DEFAULT">
+            <summary>
+             Default stream id for the archived snapshots within a channel.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_PROP_NAME">
+            <summary>
+            Directory to use for the aeron cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_DEFAULT">
+            <summary>
+            Default directory to use for the aeron cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ERROR_BUFFER_LENGTH_PROP_NAME">
+            <summary>
+            Length in bytes of the error buffer for the cluster container.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ERROR_BUFFER_LENGTH_DEFAULT">
+            <summary>
+            Default length in bytes of the error buffer for the cluster container.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_PROP_NAME">
+            <summary>
+            Is this a responding service to client requests property.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_DEFAULT">
+            <summary>
+            Default to true that this a responding service to client requests.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_PROP_NAME">
+            <summary>
+            Fragment limit to use when polling the log.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_DEFAULT">
+            <summary>
+            Default fragment limit for polling log.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.DELEGATING_ERROR_HANDLER_PROP_NAME">
+            <summary>
+            Delegating <seealso cref="T:Adaptive.Agrona.ErrorHandler"/> which will be first in the chain before delegating to the
+            <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorHandler"/>.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_NODE_ROLE_TYPE_ID">
+            <summary>
+            Counter type id for the cluster node role.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.COMMIT_POSITION_TYPE_ID">
+            <summary>
+            Counter type id of the commit position.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTERED_SERVICE_ERROR_COUNT_TYPE_ID">
+            <summary>
+            Counter type id for the clustered service error count.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ClusterId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ServiceId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ServiceName">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ReplayChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ReplayStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_PROP_NAME"/>
+            if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_PROP_NAME"/>
+            if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ControlChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ConsensusModuleStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ServiceStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SnapshotChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SnapshotStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_PROP_NAME"/>
+            if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.DEFAULT_IDLE_STRATEGY">
+            <summary>
+            Default <see cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> to be employed for cluster agents.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_IDLE_STRATEGY_PROP_NAME">
+            <summary>
+            <see cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> to be employed for cluster agents.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.IdleStrategySupplier(Adaptive.Agrona.Concurrent.StatusIndicator)">
+            <summary>
+            Create a supplier of <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/>s that will use the system property.
+            </summary>
+            <param name="controllableStatus"> if a <seealso cref="T:Adaptive.Agrona.Concurrent.ControllableIdleStrategy"/> is required. </param>
+            <returns> the new idle strategy </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ClusterDirName">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ErrorBufferLength">
+            <summary>
+            Size in bytes of the error buffer in the mark file.
+            </summary>
+            <returns> length of error buffer in bytes. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.ERROR_BUFFER_LENGTH_PROP_NAME"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.IsRespondingService">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_DEFAULT"/> or system property <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LogFragmentLimit">
+            <summary>
+            The value <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.NewClusteredService">
+            <summary>
+            Create a new <seealso cref="T:Adaptive.Cluster.Service.IClusteredService"/> based on the configured <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_CLASS_NAME_PROP_NAME"/>.
+            </summary>
+            <returns> a new <seealso cref="T:Adaptive.Cluster.Service.IClusteredService"/> based on the configured <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_CLASS_NAME_PROP_NAME"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.NewDelegatingErrorHandler">
+            <summary>
+            Create a new <seealso cref="T:Adaptive.Agrona.DelegatingErrorHandler"/> defined by <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.DELEGATING_ERROR_HANDLER_PROP_NAME"/>.
+            </summary>
+            <returns> a new <seealso cref="T:Adaptive.Agrona.DelegatingErrorHandler"/> defined by <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.DELEGATING_ERROR_HANDLER_PROP_NAME"/> or
+            null if property not set. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ClusteredServiceContainer.Context">
+            <summary>
+            The context will be owned by <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceAgent"/> after a successful
+            <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Launch(Adaptive.Cluster.Service.ClusteredServiceContainer.Context)"/> and closed via <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Dispose"/>.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Clone">
+            <summary>
+            Perform a shallow copy of the object.
+            </summary>
+            <returns> a shallow copy of the object.</returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Conclude">
+            <summary>
+            Conclude configuration by setting up defaults when specifics are not provided.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.AppVersion(System.Int32)">
+            <summary>
+            User assigned application version which appended to the log as the appVersion in new leadership events.
+            <para>
+            This can be validated using <seealso cref="T:Adaptive.Agrona.SemanticVersion"/> to ensure only application nodes of the same
+            major version communicate with each other.
+                    
+            </para>
+            </summary>
+            <param name="appVersion"> for user application. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.AppVersion">
+            <summary>
+            User assigned application version which appended to the log as the appVersion in new leadership events.
+            <para>
+            This can be validated using <seealso cref="T:Adaptive.Agrona.SemanticVersion"/> to ensure only application nodes of the same
+            major version communicate with each other.
+            
+            </para>
+            </summary>
+            <returns> appVersion for user application. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterId(System.Int32)">
+            <summary>
+            Set the id for this cluster instance. This must match with the Consensus Module.
+            </summary>
+            <param name="clusterId"> for this clustered instance. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterId">
+            <summary>
+            Get the id for this cluster instance. This must match with the Consensus Module.
+            </summary>
+            <returns> the id for this cluster instance. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ServiceId(System.Int32)">
+            <summary>
+            Set the id for this clustered service. Services should be numbered from 0 and be contiguous.
+            </summary>
+            <param name="serviceId"> for this clustered service. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ServiceId">
+            <summary>
+            Get the id for this clustered service. Services should be numbered from 0 and be contiguous.
+            </summary>
+            <returns> the id for this clustered service. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ServiceName(System.String)">
+            <summary>
+            Set the name for a clustered service to be the <see cref="M:Adaptive.Agrona.Concurrent.IAgent.RoleName"/> for the <seealso cref="T:Adaptive.Agrona.Concurrent.IAgent"/>.
+            </summary>
+            <param name="serviceName"> for a clustered service to be the role for the <seealso cref="T:Adaptive.Agrona.Concurrent.IAgent"/>. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ServiceName">
+            <summary>
+            Get the name for a clustered service to be the <see cref="M:Adaptive.Agrona.Concurrent.IAgent.RoleName"/> for the <seealso cref="T:Adaptive.Agrona.Concurrent.IAgent"/>.
+            </summary>
+            <returns> the name for a clustered service to be the role of the <seealso cref="T:Adaptive.Agrona.Concurrent.IAgent"/>. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_NAME_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ReplayChannel(System.String)">
+            <summary>
+            Set the channel parameter for the cluster log and snapshot replay channel.
+            </summary>
+            <param name="channel"> parameter for the cluster log replay channel. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ReplayChannel">
+            <summary>
+            Get the channel parameter for the cluster log and snapshot replay channel.
+            </summary>
+            <returns> the channel parameter for the cluster replay channel. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ReplayStreamId(System.Int32)">
+            <summary>
+            Set the stream id for the cluster log and snapshot replay channel.
+            </summary>
+            <param name="streamId"> for the cluster log replay channel. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ReplayStreamId">
+            <summary>
+            Get the stream id for the cluster log and snapshot replay channel.
+            </summary>
+            <returns> the stream id for the cluster log replay channel. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.REPLAY_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ControlChannel(System.String)">
+            <summary>
+            Set the channel parameter for sending messages to the Consensus Module.
+            </summary>
+            <param name="channel"> parameter for sending messages to the Consensus Module. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ControlChannel">
+            <summary>
+            Get the channel parameter for sending messages to the Consensus Module.
+            </summary>
+            <returns> the channel parameter for sending messages to the Consensus Module. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONTROL_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ServiceStreamId(System.Int32)">
+            <summary>
+            Set the stream id for communications from the consensus module and to the services.
+            </summary>
+            <param name="streamId"> for communications from the consensus module and to the services. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ServiceStreamId">
+            <summary>
+            Get the stream id for communications from the consensus module and to the services.
+            </summary>
+            <returns> the stream id for communications from the consensus module and to the services. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ConsensusModuleStreamId(System.Int32)">
+            <summary>
+            Set the stream id for communications from the services to the consensus module.
+            </summary>
+            <param name="streamId"> for communications from the services to the consensus module. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ConsensusModuleStreamId">
+            <summary>
+            Get the stream id for communications from the services to the consensus module.
+            </summary>
+            <returns> the stream id for communications from the services to the consensus module. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CONSENSUS_MODULE_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.SnapshotChannel(System.String)">
+            <summary>
+            Set the channel parameter for snapshot recordings.
+            </summary>
+            <param name="channel"> parameter for snapshot recordings </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.SnapshotChannel">
+            <summary>
+            Get the channel parameter for snapshot recordings.
+            </summary>
+            <returns> the channel parameter for snapshot recordings. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.SnapshotStreamId(System.Int32)">
+            <summary>
+            Set the stream id for snapshot recordings.
+            </summary>
+            <param name="streamId"> for snapshot recordings. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.SnapshotStreamId">
+            <summary>
+            Get the stream id for snapshot recordings.
+            </summary>
+            <returns> the stream id for snapshot recordings. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SNAPSHOT_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.IsRespondingService(System.Boolean)">
+            <summary>
+            Set if this a service that responds to client requests.
+            </summary>
+            <param name="isRespondingService"> true if this service responds to client requests, otherwise false. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.LogFragmentLimit(System.Int32)">
+            <summary>
+            Set the fragment limit to be used when polling the log <seealso cref="T:Adaptive.Aeron.Subscription"/>.
+            </summary>
+            <param name="logFragmentLimit"> for this clustered service. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_DEFAULT"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.LogFragmentLimit">
+            <summary>
+            Get the fragment limit to be used when polling the log <seealso cref="T:Adaptive.Aeron.Subscription"/>.
+            </summary>
+            <returns> the fragment limit to be used when polling the log <seealso cref="T:Adaptive.Aeron.Subscription"/>. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.LOG_FRAGMENT_LIMIT_DEFAULT"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.IsRespondingService">
+            <summary>
+            Is this a service that responds to client requests?
+            </summary>
+            <returns> true if this service responds to client requests, otherwise false. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.RESPONDER_SERVICE_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ThreadFactory">
+            <summary>
+            Get the thread factory used for creating threads.
+            </summary>
+            <returns> thread factory used for creating threads. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ThreadFactory(Adaptive.Agrona.Concurrent.IThreadFactory)">
+            <summary>
+            Set the thread factory used for creating threads.
+            </summary>
+            <param name="threadFactory"> used for creating threads </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.IdleStrategySupplier(System.Func{Adaptive.Agrona.Concurrent.IIdleStrategy})">
+            <summary>
+            Provides an <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> supplier for the idle strategy for the agent duty cycle.
+            </summary>
+            <param name="idleStrategySupplier"> supplier for the idle strategy for the agent duty cycle. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.IdleStrategy">
+            <summary>
+            Get a new <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.IdleStrategy"/> based on configured supplier.
+            </summary>
+            <returns> a new <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.IdleStrategy"/> based on configured supplier. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.EpochClock(Adaptive.Agrona.Concurrent.IEpochClock)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.Concurrent.IEpochClock"/> to be used for tracking wall clock time when interacting with the container.
+            </summary>
+            <param name="clock"> <seealso cref="T:Adaptive.Agrona.Concurrent.IEpochClock"/> to be used for tracking wall clock time when interacting with the container. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.EpochClock">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Agrona.Concurrent.IEpochClock"/> to used for tracking wall clock time within the container.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Agrona.Concurrent.IEpochClock"/> to used for tracking wall clock time within the container. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorHandler">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Agrona.ErrorHandler"/> to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Agrona.ErrorHandler"/> to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorHandler(Adaptive.Agrona.ErrorHandler)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.ErrorHandler"/> to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>.
+            </summary>
+            <param name="errorHandler"> the error handler to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>. </param>
+            <returns> this for a fluent API </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.DelegatingErrorHandler">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Agrona.DelegatingErrorHandler"/> to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/> which will
+            delegate to <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorHandler"/> as next in the chain.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Agrona.DelegatingErrorHandler"/> to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.DELEGATING_ERROR_HANDLER_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.DelegatingErrorHandler(Adaptive.Agrona.DelegatingErrorHandler)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.DelegatingErrorHandler"/> to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/> which will
+            delegate to <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorHandler"/> as next in the chain.
+            </summary>
+            <param name="delegatingErrorHandler"> the error handler to be used by the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer"/>. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.DELEGATING_ERROR_HANDLER_PROP_NAME"> </seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorCounter">
+            <summary>
+            Get the error counter that will record the number of errors the container has observed.
+            </summary>
+            <returns> the error counter that will record the number of errors the container has observed. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorCounter(Adaptive.Agrona.Concurrent.Status.AtomicCounter)">
+            <summary>
+            Set the error counter that will record the number of errors the cluster node has observed.
+            </summary>
+            <param name="errorCounter"> the error counter that will record the number of errors the cluster node has observed. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.CountedErrorHandler(Adaptive.Agrona.Concurrent.CountedErrorHandler)">
+            <summary>
+            Non-default for context.
+            </summary>
+            <param name="countedErrorHandler"> to override the default. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.CountedErrorHandler">
+            <summary>
+            The <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorHandler"/> that will increment <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorCounter"/> by default.
+            </summary>
+            <returns> <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorHandler"/> that will increment <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorCounter"/> by default. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.AeronDirectoryName(System.String)">
+            <summary>
+            Set the top level Aeron directory used for communication between the Aeron client and Media Driver.
+            </summary>
+            <param name="aeronDirectoryName"> the top level Aeron directory. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.AeronDirectoryName">
+            <summary>
+            Get the top level Aeron directory used for communication between the Aeron client and Media Driver.
+            </summary>
+            <returns> The top level Aeron directory. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Aeron">
+            <summary>
+            An <seealso cref="T:Adaptive.Aeron.Aeron"/> client for the container.
+            </summary>
+            <returns> <seealso cref="T:Adaptive.Aeron.Aeron"/> client for the container </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Aeron(Adaptive.Aeron.Aeron)">
+            <summary>
+            Provide an <seealso cref="T:Adaptive.Aeron.Aeron"/> client for the container
+            <para>
+            If not provided then one will be created.
+            
+            </para>
+            </summary>
+            <param name="aeron"> client for the container </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.OwnsAeronClient(System.Boolean)">
+            <summary>
+            Does this context own the <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Aeron"/> client and this takes responsibility for closing it?
+            </summary>
+            <param name="ownsAeronClient"> does this context own the <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Aeron"/> client. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.OwnsAeronClient">
+            <summary>
+            Does this context own the <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Aeron"/> client and this takes responsibility for closing it?
+            </summary>
+            <returns> does this context own the <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Aeron"/> client and this takes responsibility for closing it? </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusteredService">
+            <summary>
+            The service this container holds.
+            </summary>
+            <returns> service this container holds. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusteredService(Adaptive.Cluster.Service.IClusteredService)">
+            <summary>
+            Set the service this container is to hold.
+            </summary>
+            <param name="clusteredService"> this container is to hold. </param>
+            <returns> this for fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ArchiveContext(Adaptive.Archiver.AeronArchive.Context)">
+            <summary>
+            Set the context that should be used for communicating with the local Archive.
+            </summary>
+            <param name="archiveContext"> that should be used for communicating with the local Archive. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ArchiveContext">
+            <summary>
+            Get the context that should be used for communicating with the local Archive.
+            </summary>
+            <returns> the context that should be used for communicating with the local Archive. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterDirectoryName(System.String)">
+            <summary>
+            Set the directory name to use for the consensus module directory..
+            </summary>
+            <param name="clusterDirectoryName"> to use. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_PROP_NAME"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterDirectoryName">
+            <summary>
+            The directory name to use for the cluster directory.
+            </summary>
+            <returns> directory name for the cluster directory. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_PROP_NAME"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterDir(System.IO.DirectoryInfo)">
+            <summary>
+            Set the directory to use for the cluster directory.
+            </summary>
+            <param name="clusterDir"> to use. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterDir">
+            <summary>
+            The directory used for the cluster directory.
+            </summary>
+            <returns>  directory for the cluster directory. </returns>
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.CLUSTER_DIR_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ShutdownSignalBarrier(Adaptive.Agrona.Concurrent.ShutdownSignalBarrier)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.Concurrent.ShutdownSignalBarrier"/> that can be used to shut down a clustered service.
+            </summary>
+            <param name="barrier"> that can be used to shut down a clustered service. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ShutdownSignalBarrier">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Agrona.Concurrent.ShutdownSignalBarrier"/> that can be used to shut down a clustered service.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Agrona.Concurrent.ShutdownSignalBarrier"/> that can be used to shut down a clustered service. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.TerminationHook(System.Action)">
+            <summary>
+            Set the <seealso cref="T:System.Action"/> that is called when container is instructed to terminate.
+            </summary>
+            <param name="terminationHook"> that can be used to terminate a service container. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.TerminationHook">
+            <summary>
+            Get the <seealso cref="T:System.Action"/> that is called when container is instructed to terminate.
+            <para>
+            The default action is to call signal on the <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ShutdownSignalBarrier"/>.
+            
+            </para>
+            </summary>
+            <returns> the <seealso cref="T:System.Action"/> that can be used to terminate a service container. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterMarkFile(Adaptive.Cluster.ClusterMarkFile)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Cluster.ClusterMarkFile"/> in use.
+            </summary>
+            <param name="cncFile"> to use. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ClusterMarkFile">
+            <summary>
+            The <seealso cref="T:Adaptive.Cluster.ClusterMarkFile"/> in use.
+            </summary>
+            <returns> CnC file in use. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorBufferLength(System.Int32)">
+            <summary>
+            Set the error buffer length in bytes to use.
+            </summary>
+            <param name="errorBufferLength"> in bytes to use. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorBufferLength">
+            <summary>
+            The error buffer length in bytes.
+            </summary>
+            <returns> error buffer length in bytes. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorLog(Adaptive.Agrona.Concurrent.Errors.DistinctErrorLog)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.Concurrent.Errors.DistinctErrorLog"/> in use.
+            </summary>
+            <param name="errorLog"> to use. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ErrorLog">
+            <summary>
+            The <seealso cref="T:Adaptive.Agrona.Concurrent.Errors.DistinctErrorLog"/> in use.
+            </summary>
+            <returns> <seealso cref="T:Adaptive.Agrona.Concurrent.Errors.DistinctErrorLog"/> in use. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.DeleteDirectory">
+            <summary>
+            Delete the cluster container directory.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Dispose">
+            <summary>
+            Close the context and free applicable resources.
+            <para>
+            If <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.OwnsAeronClient"/> is true then the <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.Aeron"/> client will be closed.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.ToString">
+            <summary>
+            {@inheritDoc}
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ClusterNodeControlProperties">
+            <summary>
+            Data class for holding the properties used when interacting with a cluster for local admin control.
+            </summary>
+            <seealso cref="T:Adaptive.Cluster.ClusterMarkFile"></seealso>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusterNodeControlProperties.aeronDirectoryName">
+            <summary>
+            Directory where the Aeron Media Driver is running.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusterNodeControlProperties.controlChannel">
+            <summary>
+            URI for the control channel.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusterNodeControlProperties.serviceStreamId">
+            <summary>
+            Stream id in the control channel on which the services listen.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusterNodeControlProperties.consensusModuleStreamId">
+            <summary>
+            Stream id in the control channel on which the consensus module listens.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ClusterNodeControlProperties.#ctor(System.Int32,System.Int32,System.String,System.String)">
+            <summary>
+            Construct the set of properties for interacting with a cluster.
+            </summary>
+            <param name="serviceStreamId">         in the control channel on which the services listen. </param>
+            <param name="consensusModuleStreamId"> in the control channel on which the consensus module listens. </param>
+            <param name="aeronDirectoryName">      where the Aeron Media Driver is running. </param>
+            <param name="controlChannel">          for the services and consensus module. </param>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ClusterRole">
+            <summary>
+            Role of the node in the cluster.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusterRole.Follower">
+            <summary>
+            The cluster node is a follower in the current leadership term.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusterRole.Candidate">
+            <summary>
+            The cluster node is a candidate to become a leader in an election.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.ClusterRole.Leader">
+            <summary>
+            The cluster node is the leader for the current leadership term.
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ClusterTerminationException">
+            <summary>
+            Used to terminate the <seealso cref="T:Adaptive.Agrona.Concurrent.IAgent"/> within a cluster in an expected fashion.
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ConsensusModuleProxy">
+            <summary>
+            Proxy for communicating with the Consensus Module over IPC.
+            <para>
+            Note: This class is not for public use.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ConsensusModuleProxy.#ctor(Adaptive.Aeron.Publication)">
+            <summary>
+            Construct a proxy to the consensus module that will send messages over a provided <seealso cref="T:Adaptive.Aeron.Publication"/>.
+            </summary>
+            <param name="publication"> for sending messages to the consensus module. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ConsensusModuleProxy.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ConsensusModuleProxy.ClusterMembersQuery(System.Int64)">
+            <summary>
+            Query for the current cluster members.
+            </summary>
+            <param name="correlationId"> for the request. </param>
+            <returns> true of the request was successfully sent, otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ConsensusModuleProxy.RemoveMember(System.Int32,Adaptive.Cluster.Codecs.BooleanType)">
+            <summary>
+            Remove a member by id from the cluster.
+            </summary>
+            <param name="memberId">  to be removed. </param>
+            <param name="isPassive"> to indicate if the member is passive or not. </param>
+            <returns> true of the request was successfully sent, otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ContainerClientSession.ToString">
+            <summary>
+            {@inheritDoc}
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.ICluster">
+            <summary>
+            Interface for a <seealso cref="T:Adaptive.Cluster.Service.IClusteredService"/> to interact with cluster hosting it.
+            <para>
+            This object should only be used to send messages to the cluster or schedule timers in response to other messages
+            and timers. Sending messages and timers should not happen from cluster lifecycle methods like
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnStart(Adaptive.Cluster.Service.ICluster,Adaptive.Aeron.Image)"/>, <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnRoleChange(Adaptive.Cluster.Service.ClusterRole)"/> or
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnTakeSnapshot(Adaptive.Aeron.ExclusivePublication)"/>, or <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnTerminate(Adaptive.Cluster.Service.ICluster)"/>,
+            with the exception of the session lifecycle methods <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionOpen(Adaptive.Cluster.Service.IClientSession,System.Int64)"/> and
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionClose(Adaptive.Cluster.Service.IClientSession,System.Int64,Adaptive.Cluster.Codecs.CloseReason)"/> and <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnNewLeadershipTermEvent(System.Int64,System.Int64,System.Int64,System.Int64,System.Int32,System.Int32,Adaptive.Cluster.Codecs.ClusterTimeUnit,System.Int32)"/>.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.ICluster.MemberId">
+            <summary>
+            The unique id for the hosting member of the cluster. Useful only for debugging purposes.
+            </summary>
+            <returns> unique id for the hosting member of the cluster. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.LogPosition">
+            <summary>
+            Position the log has reached in bytes as of the current message.
+            </summary>
+            <returns> position the log has reached in bytes as of the current message. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.ICluster.Role">
+            <summary>
+            The role the cluster node is playing.
+            </summary>
+            <returns> the role the cluster node is playing. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.ICluster.Aeron">
+            <summary>
+            Get the <seealso cref="P:Adaptive.Cluster.Service.ICluster.Aeron"/> client used by the cluster.
+            </summary>
+            <returns> the <seealso cref="P:Adaptive.Cluster.Service.ICluster.Aeron"/> client used by the cluster. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.ICluster.Context">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer.Context"/> under which the container is running.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Service.ClusteredServiceContainer.Context"/> under which the container is running. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.GetClientSession(System.Int64)">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/> for a given cluster session id.
+            </summary>
+            <param name="clusterSessionId"> to be looked up. </param>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/> that matches the clusterSessionId. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.ICluster.ClientSessions">
+            <summary>
+            Get all <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/>s.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/>s. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.ForEachClientSession(System.Action{Adaptive.Cluster.Service.IClientSession})">
+            <summary>
+            For each iterator over <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/>s using the most efficient method possible.
+            </summary>
+            <param name="action"> to be taken for each <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/> in turn. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.CloseClientSession(System.Int64)">
+            <summary>
+            Request the close of a <seealso cref="T:Adaptive.Cluster.Service.IClientSession"/> by sending the request to the consensus module.
+            </summary>
+            <param name="clusterSessionId"> to be closed. </param>
+            <returns> true if the event to close a session was sent or false if back pressure was applied. </returns>
+            <exception cref="T:Adaptive.Cluster.Client.ClusterException"> if the clusterSessionId is not recognised. </exception>
+        </member>
+        <member name="P:Adaptive.Cluster.Service.ICluster.Time">
+            <summary>
+            Cluster time as <seealso cref="M:Adaptive.Cluster.Service.ICluster.TimeUnit"/>s since 1 Jan 1970 UTC.
+            </summary>
+            <returns> time as <seealso cref="M:Adaptive.Cluster.Service.ICluster.TimeUnit"/>s since 1 Jan 1970 UTC. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.TimeUnit">
+            <summary>
+            The unit of time applied when timestamping and <seealso cref="P:Adaptive.Cluster.Service.ICluster.Time"/> operations.
+            </summary>
+            <returns> the unit of time applied when timestamping and <seealso cref="P:Adaptive.Cluster.Service.ICluster.Time"/> operations. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.ScheduleTimer(System.Int64,System.Int64)">
+            <summary>
+            Schedule a timer for a given deadline and provide a correlation id to identify the timer when it expires or
+            for cancellation. This action is asynchronous and will race with the timer expiring.
+            <para>
+            If the correlationId is for an existing scheduled timer then it will be rescheduled to the new deadline. However
+            it is best to generate correlationIds in a monotonic fashion and be aware of potential clashes with other
+            services in the same cluster. Service isolation can be achieved by using the upper bits for service id.
+            </para>
+            <para>
+            Timers should only be scheduled or cancelled in the context of processing a
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionMessage(Adaptive.Cluster.Service.IClientSession,System.Int64,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)"/>,
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnTimerEvent(System.Int64,System.Int64)"/>,
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionOpen(Adaptive.Cluster.Service.IClientSession,System.Int64)"/>, or
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionClose(Adaptive.Cluster.Service.IClientSession,System.Int64,Adaptive.Cluster.Codecs.CloseReason)"/>.
+            If applied to other events then they are not guaranteed to be reliable.
+              
+            </para>
+            </summary>
+            <param name="correlationId"> to identify the timer when it expires. <seealso cref="F:System.Int64.MaxValue"/> not supported. </param>
+            <param name="deadline">      time after which the timer will fire. <seealso cref="F:System.Int64.MaxValue"/> not supported. </param>
+            <returns> true if the event to schedule a timer request has been sent or false if back pressure is applied. </returns>
+            <seealso cref="M:Adaptive.Cluster.Service.ICluster.CancelTimer(System.Int64)"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.CancelTimer(System.Int64)">
+            <summary>
+            Cancel a previously scheduled timer. This action is asynchronous and will race with the timer expiring.
+            <para>
+            Timers should only be scheduled or cancelled in the context of processing a
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionMessage(Adaptive.Cluster.Service.IClientSession,System.Int64,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)"/>,
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnTimerEvent(System.Int64,System.Int64)"/>,
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionOpen(Adaptive.Cluster.Service.IClientSession,System.Int64)"/>, or
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnSessionClose(Adaptive.Cluster.Service.IClientSession,System.Int64,Adaptive.Cluster.Codecs.CloseReason)"/>.
+            If applied to other events then they are not guaranteed to be reliable.
+               
+            </para>
+            </summary>
+            <param name="correlationId"> for the timer provided when it was scheduled. <seealso cref="F:System.Int64.MaxValue"/> not supported. </param>
+            <returns> true if the event to cancel request has been sent or false if back-pressure is applied. </returns>
+            <seealso cref="M:Adaptive.Cluster.Service.ICluster.ScheduleTimer(System.Int64,System.Int64)"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.Offer(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32)">
+            <summary>
+            Offer a message as ingress to the cluster for sequencing. This will happen efficiently over IPC to the
+            consensus module and have the cluster session of as the negative value of the
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_PROP_NAME"/>.
+            </summary>
+            <param name="buffer"> containing the message to be offered. </param>
+            <param name="offset"> in the buffer at which the encoded message begins. </param>
+            <param name="length"> in the buffer of the encoded message. </param>
+            <returns> positive value if successful. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.Offer(Adaptive.Aeron.DirectBufferVector[])">
+            <summary>
+            Offer a message as ingress to the cluster for sequencing. This will happen efficiently over IPC to the
+            consensus module and have the cluster session of as the negative value of the
+            <seealso cref="F:Adaptive.Cluster.Service.ClusteredServiceContainer.Configuration.SERVICE_ID_PROP_NAME"/>.
+            <para>
+            The first vector must be left free to be filled in for the session message header.
+            
+            </para>
+            </summary>
+            <param name="vectors"> containing the message parts with the first left to be filled. </param>
+            <returns> positive value if successful. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)">
+            <summary>
+            Try to claim a range in the publication log into which a message can be written with zero copy semantics.
+            Once the message has been written then <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Commit"/> should be called thus making it available.
+            <para>
+            On successful claim, the Cluster egress header will be written to the start of the claimed buffer section.
+            Clients <b>MUST</b> write into the claimed buffer region at offset + <seealso cref="F:Adaptive.Cluster.Client.AeronCluster.SESSION_HEADER_LENGTH"/>.
+            <pre>{@code
+                final IDirectBuffer srcBuffer = AcquireMessage();
+               
+                if (cluster.TryClaim(length, bufferClaim) > 0L)
+                {
+                    try
+                    {
+                         final IMutableDirectBuffer buffer = bufferClaim.Buffer;
+                         final int offset = bufferClaim.Offset;
+                         // ensure that data is written at the correct offset
+                         buffer.PutBytes(offset + AeronCluster.SESSION_HEADER_LENGTH, srcBuffer, 0, length);
+                    }
+                    finally
+                    {
+                        bufferClaim.Commit();
+                    }
+                }
+            }</pre>
+               
+            </para>
+            </summary>
+            <param name="length">      of the range to claim, in bytes. </param>
+            <param name="bufferClaim"> to be populated if the claim succeeds. </param>
+            <returns> The new stream position, otherwise a negative error value as specified in
+                    <seealso cref="M:Adaptive.Aeron.Publication.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)"/>. </returns>
+            <exception cref="T:System.ArgumentException"> if the length is greater than <seealso cref="P:Adaptive.Aeron.Publication.MaxPayloadLength"/>. </exception>
+            <seealso cref="M:Adaptive.Aeron.Publication.TryClaim(System.Int32,Adaptive.Aeron.LogBuffer.BufferClaim)"/>
+            <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Commit"/>
+            <seealso cref="M:Adaptive.Aeron.LogBuffer.BufferClaim.Abort"/>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.ICluster.IdleStrategy">
+            <summary>
+            <seealso cref="M:Adaptive.Cluster.Service.ICluster.IdleStrategy"/> which should be used by the service when it experiences back-pressure on egress,
+            closing sessions, making timer requests, or any long-running actions.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Cluster.Service.ICluster.IdleStrategy"/> which should be used by the service when it experiences back-pressure. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.IClusteredService">
+            <summary>
+            Interface which a service must implement to be contained in the cluster.
+            <para>
+            The {@code cluster} object should only be used to send messages to the cluster or schedule timers in
+            response to other messages and timers. Sending messages and timers should not happen from cluster lifecycle
+            methods like <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnStart(Adaptive.Cluster.Service.ICluster,Adaptive.Aeron.Image)"/>, <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnRoleChange(Adaptive.Cluster.Service.ClusterRole)"/> or
+            <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnTakeSnapshot(Adaptive.Aeron.ExclusivePublication)"/>, or <seealso cref="M:Adaptive.Cluster.Service.IClusteredService.OnTerminate(Adaptive.Cluster.Service.ICluster)"/>, with the exception of
+            the session lifecycle methods.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnStart(Adaptive.Cluster.Service.ICluster,Adaptive.Aeron.Image)">
+            <summary>
+            Start event for the service where the service can perform any initialisation required and load snapshot state.
+            The snapshot image can be null if no previous snapshot exists.
+            <para>
+            <b>Note:</b> As this is a potentially long-running operation the implementation should use
+            <seealso cref="M:Adaptive.Cluster.Service.ICluster.IdleStrategy"/> and then occasionally call <seealso cref="M:Adaptive.Agrona.Concurrent.IIdleStrategy.Idle"/> or
+            <seealso cref="M:Adaptive.Agrona.Concurrent.IIdleStrategy.Idle(System.Int32)"/>, especially when polling the <seealso cref="T:Adaptive.Aeron.Image"/> returns 0.
+               
+            </para>
+            </summary>
+            <param name="cluster">       with which the service can interact. </param>
+            <param name="snapshotImage"> from which the service can load its archived state which can be null when no snapshot. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnSessionOpen(Adaptive.Cluster.Service.IClientSession,System.Int64)">
+            <summary>
+            A session has been opened for a client to the cluster.
+            </summary>
+            <param name="session">       for the client which have been opened. </param>
+            <param name="timestamp">   at which the session was opened. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnSessionClose(Adaptive.Cluster.Service.IClientSession,System.Int64,Adaptive.Cluster.Codecs.CloseReason)">
+            <summary>
+            A session has been closed for a client to the cluster.
+            </summary>
+            <param name="session">     that has been closed. </param>
+            <param name="timestamp"> at which the session was closed. </param>
+            <param name="closeReason"> the session was closed. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnSessionMessage(Adaptive.Cluster.Service.IClientSession,System.Int64,Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)">
+            <summary>
+            A message has been received to be processed by a clustered service.
+            </summary>
+            <param name="session">      for the client which sent the message. </param>
+            <param name="timestamp"> for when the message was received. </param>
+            <param name="buffer">      containing the message. </param>
+            <param name="offset">      in the buffer at which the message is encoded. </param>
+            <param name="length">      of the encoded message. </param>
+            <param name="header">      aeron header for the incoming message. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnTimerEvent(System.Int64,System.Int64)">
+            <summary>
+            A scheduled timer has expired.
+            </summary>
+            <param name="correlationId"> for the expired timer. </param>
+            <param name="timestamp">   at which the timer expired. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnTakeSnapshot(Adaptive.Aeron.ExclusivePublication)">
+            <summary>
+            The service should take a snapshot and store its state to the provided archive <seealso cref="T:Adaptive.Aeron.Publication"/>.
+            <para>
+            <b>Note:</b> As this is a potentially long-running operation the implementation should use
+            <seealso cref="M:Adaptive.Cluster.Service.ICluster.IdleStrategy"/> and then occasionally call <seealso cref="M:Adaptive.Agrona.Concurrent.IIdleStrategy.Idle"/> or
+            <seealso cref="M:Adaptive.Agrona.Concurrent.IIdleStrategy.Idle(System.Int32)"/>, especially when the <seealso cref="T:Adaptive.Aeron.ExclusivePublication"/> returns <seealso cref="F:Adaptive.Aeron.Publication.BACK_PRESSURED"/>.
+            
+            </para>
+            </summary>
+            <param name="snapshotPublication"> to which the state should be recorded. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnRoleChange(Adaptive.Cluster.Service.ClusterRole)">
+            <summary>
+            Notify that the cluster node has changed role.
+            </summary>
+            <param name="newRole"> that the node has assumed. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnTerminate(Adaptive.Cluster.Service.ICluster)">
+            <summary>
+            Called when the container is going to terminate.
+            </summary>
+            <param name="cluster"> with which the service can interact. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.IClusteredService.OnNewLeadershipTermEvent(System.Int64,System.Int64,System.Int64,System.Int64,System.Int32,System.Int32,Adaptive.Cluster.Codecs.ClusterTimeUnit,System.Int32)">
+            <summary>
+            An election has been successful and a leader has entered a new term.
+            </summary>
+            <param name="leadershipTermId">    identity for the new leadership term. </param>
+            <param name="logPosition">         position the log has reached as the result of this message. </param>
+            <param name="timestamp">           for the new leadership term. </param>
+            <param name="termBaseLogPosition"> position at the beginning of the leadership term. </param>
+            <param name="leaderMemberId">      who won the election. </param>
+            <param name="logSessionId">        session id for the publication of the log. </param>
+            <param name="timeUnit">            for the timestamps in the coming leadership term. </param>
+            <param name="appVersion">          for the application configured in the consensus module. </param>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.RecoveryState">
+             <summary>
+             Counter representing the Recovery State for the cluster.
+             
+             Key layout as follows:
+            
+               0                   1                   2                   3
+               0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+              |                     Leadership Term ID                        |
+              |                                                               |
+              +---------------------------------------------------------------+
+              |                  Log position for Snapshot                    |
+              |                                                               |
+              +---------------------------------------------------------------+
+              |              Timestamp at beginning of Recovery               |
+              |                                                               |
+              +---------------------------------------------------------------+
+              |                         Cluster ID                            |
+              +---------------------------------------------------------------+
+              |                     Count of Services                         |
+              +---------------------------------------------------------------+
+              |             Snapshot Recording ID (Service ID 0)              |
+              |                                                               |
+              +---------------------------------------------------------------+
+              |             Snapshot Recording ID (Service ID n)              |
+              |                                                               |
+              +---------------------------------------------------------------+
+            
+             </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.RecoveryState.RECOVERY_STATE_TYPE_ID">
+            <summary>
+            Type id of a recovery state counter.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.RecoveryState.NAME">
+            <summary>
+            Human-readable name for the counter.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.RecoveryState.FindCounterId(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32)">
+            <summary>
+            Find the active counter id for recovery state.
+            </summary>
+            <param name="counters"> to search within. </param>
+            <param name="clusterId"> to constrain the search. </param>
+            <returns> the counter id if found otherwise <seealso cref="F:Adaptive.Agrona.Concurrent.Status.CountersReader.NULL_COUNTER_ID"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.RecoveryState.GetLeadershipTermId(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32)">
+            <summary>
+            Get the leadership term id for the snapshot state. <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if no snapshot for recovery.
+            </summary>
+            <param name="counters">  to search within. </param>
+            <param name="counterId"> for the active consensus position. </param>
+            <returns> the leadership term id if found otherwise <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.RecoveryState.GetLogPosition(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32)">
+            <summary>
+             Get the position at which the snapshot was taken. <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if no snapshot for recovery.
+            </summary>
+            <param name="counters">  to search within. </param>
+            <param name="counterId"> for the active consensus position. </param>
+            <returns> the log position if found otherwise <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.RecoveryState.GetTimestamp(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32)">
+            <summary>
+            Get the timestamp at the beginning of recovery. <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if no snapshot for recovery.
+            </summary>
+            <param name="counters">  to search within. </param>
+            <param name="counterId"> for the active recovery counter. </param>
+            <returns> the timestamp if found otherwise <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.RecoveryState.GetSnapshotRecordingId(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32,System.Int32)">
+            <summary>
+            Get the recording id of the snapshot for a service.
+            </summary>
+            <param name="counters">  to search within. </param>
+            <param name="counterId"> for the active recovery counter. </param>
+            <param name="serviceId"> for the snapshot required. </param>
+            <returns> the count of replay terms if found otherwise <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </returns>
+        </member>
+        <member name="T:Adaptive.Cluster.Service.SnapshotTaker">
+            <summary>
+            Based class of common functions required to take a snapshot of cluster state.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.SnapshotTaker.bufferClaim">
+            <summary>
+            Reusable <seealso cref="T:Adaptive.Cluster.Codecs.MessageHeaderEncoder"/> to avoid allocation.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.SnapshotTaker.messageHeaderEncoder">
+            <summary>
+            <seealso cref="T:Adaptive.Aeron.Publication"/> to which the snapshot will be written.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.SnapshotTaker.publication">
+            <summary>
+            <seealso cref="T:Adaptive.Aeron.Publication"/> to which the snapshot will be written.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Cluster.Service.SnapshotTaker.idleStrategy">
+            <summary>
+            <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> to be called when back pressure is propagated from the <seealso cref="F:Adaptive.Cluster.Service.SnapshotTaker.publication"/>.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.#ctor(Adaptive.Aeron.ExclusivePublication,Adaptive.Agrona.Concurrent.IIdleStrategy,Adaptive.Agrona.Concurrent.AgentInvoker)">
+            <summary>
+            Construct a <seealso cref="T:Adaptive.Cluster.Service.SnapshotTaker"/> which will encode the snapshot to a publication.
+            </summary>
+            <param name="publication">       into which the snapshot will be encoded. </param>
+            <param name="idleStrategy">      to call when the publication is back pressured. </param>
+            <param name="aeronAgentInvoker"> to call when idling so it stays active. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.MarkBegin(System.Int64,System.Int64,System.Int64,System.Int32,Adaptive.Cluster.Codecs.ClusterTimeUnit,System.Int32)">
+            <summary>
+            Mark the beginning of the encoded snapshot.
+            </summary>
+            <param name="snapshotTypeId">   type to identify snapshot within a cluster. </param>
+            <param name="logPosition">      at which the snapshot was taken. </param>
+            <param name="leadershipTermId"> at which the snapshot was taken. </param>
+            <param name="snapshotIndex">    so the snapshot can be sectioned. </param>
+            <param name="timeUnit">         of the cluster timestamps stored in the snapshot. </param>
+            <param name="appVersion">       associated with the snapshot from <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.AppVersion"/>. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.MarkEnd(System.Int64,System.Int64,System.Int64,System.Int32,Adaptive.Cluster.Codecs.ClusterTimeUnit,System.Int32)">
+            <summary>
+            Mark the end of the encoded snapshot.
+            </summary>
+            <param name="snapshotTypeId">   type to identify snapshot within a cluster. </param>
+            <param name="logPosition">      at which the snapshot was taken. </param>
+            <param name="leadershipTermId"> at which the snapshot was taken. </param>
+            <param name="snapshotIndex">    so the snapshot can be sectioned. </param>
+            <param name="timeUnit">         of the cluster timestamps stored in the snapshot. </param>
+            <param name="appVersion">       associated with the snapshot from <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.AppVersion"/>. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.MarkSnapshot(System.Int64,System.Int64,System.Int64,System.Int32,Adaptive.Cluster.Codecs.SnapshotMark,Adaptive.Cluster.Codecs.ClusterTimeUnit,System.Int32)">
+            <summary>
+            Generically <seealso cref="T:Adaptive.Cluster.Codecs.SnapshotMark"/> a snapshot.
+            </summary>
+            <param name="snapshotTypeId">   type to identify snapshot within a cluster. </param>
+            <param name="logPosition">      at which the snapshot was taken. </param>
+            <param name="leadershipTermId"> at which the snapshot was taken. </param>
+            <param name="snapshotIndex">    so the snapshot can be sectioned. </param>
+            <param name="snapshotMark">     which specifies the type of snapshot mark. </param>
+            <param name="timeUnit">         of the cluster timestamps stored in the snapshot. </param>
+            <param name="appVersion">       associated with the snapshot from <seealso cref="M:Adaptive.Cluster.Service.ClusteredServiceContainer.Context.AppVersion"/>. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.CheckInterruptStatus">
+            <summary>
+            Check for thread interrupt and throw an <seealso cref="T:Adaptive.Agrona.Concurrent.AgentTerminationException"/> if interrupted.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.CheckResult(System.Int64)">
+            <summary>
+            Check the result of offering to a publication when writing a snapshot.
+            </summary>
+            <param name="result"> of an offer or try claim to a publication. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.CheckResultAndIdle(System.Int64)">
+            <summary>
+            Check the result of offering to a publication when writing a snapshot and then idle after invoking the client
+            agent if necessary.
+            </summary>
+            <param name="result"> of an offer or try claim to a publication. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.Service.SnapshotTaker.InvokeAgentClient">
+            <summary>
+            Invoke the Aeron client agent if necessary.
+            </summary>
+        </member>
+        <member name="T:Adaptive.Cluster.ClusterMarkFile">
+            <summary>
+            Used to indicate if a cluster service is running and what configuration it is using. Errors encountered by
+            the service are recorded in within this file by a <see cref="T:Adaptive.Agrona.Concurrent.Errors.DistinctErrorLog"/>
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.#ctor(System.IO.FileInfo,Adaptive.Cluster.Codecs.Mark.ClusterComponentType,System.Int32,Adaptive.Agrona.Concurrent.IEpochClock,System.Int64)">
+            <summary>
+            Create new <seealso cref="T:Adaptive.Agrona.MarkFile"/> for a cluster service but check if an existing service is active.
+            </summary>
+            <param name="file">              full qualified file to the <seealso cref="T:Adaptive.Agrona.MarkFile"/>. </param>
+            <param name="type">              of cluster component the <seealso cref="T:Adaptive.Agrona.MarkFile"/> represents. </param>
+            <param name="errorBufferLength"> for storing the error log. </param>
+            <param name="epochClock">        for checking liveness against. </param>
+            <param name="timeoutMs">         for the activity check on an existing <seealso cref="T:Adaptive.Agrona.MarkFile"/>. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.#ctor(System.IO.DirectoryInfo,System.String,Adaptive.Agrona.Concurrent.IEpochClock,System.Int64,System.Action{System.String})">
+            <summary>
+            Construct to read the status of an existing <seealso cref="T:Adaptive.Agrona.MarkFile"/> for a cluster component.
+            </summary>
+            <param name="directory">  in which the mark file exists. </param>
+            <param name="filename">   for the <seealso cref="T:Adaptive.Agrona.MarkFile"/>. </param>
+            <param name="epochClock"> to be used for checking liveness. </param>
+            <param name="timeoutMs">  to wait for file to exist. </param>
+            <param name="logger">     to which debug information will be written if an issue occurs. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.IsServiceMarkFile(System.IO.FileInfo)">
+            <summary>
+            Determines if this path name matches the service mark file name pattern
+            </summary>
+            <param name="path">       to examine </param>
+            <returns> true if the name matches </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.IsConsensusModuleMarkFile(System.IO.FileInfo)">
+            <summary>
+            Determines if this path name matches the consensus module file name pattern.
+            </summary>
+            <param name="path">       to examine </param>
+            <returns> true if the name matches </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="P:Adaptive.Cluster.ClusterMarkFile.IsClosed">
+            <summary>
+            Check if the <seealso cref="T:Adaptive.Agrona.MarkFile"/> is closed.
+            </summary>
+            <returns> true if the <seealso cref="T:Adaptive.Agrona.MarkFile"/> is closed. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.CandidateTermId">
+            <summary>
+            Get the current value of a candidate term id if a vote is placed in an election.
+            </summary>
+            <returns> the current candidate term id within an election after voting or <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if
+            no voting phase of an election is currently active. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.CandidateTermId(System.Int64,System.Int32)">
+            <summary>
+            Record the fact that a node is aware of an election, so it can survive a restart.
+            </summary>
+            <param name="candidateTermId"> to record that a vote has taken place. </param>
+            <param name="fileSyncLevel"> as defined by cluster file sync level.</param>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.ProposeMaxCandidateTermId(System.Int64,System.Int32)">
+            <summary>
+            Record the fact that a node is aware of an election, so it can survive a restart.
+            </summary>
+            <param name="candidateTermId"> to record that a vote has taken place. </param>
+            <param name="fileSyncLevel">   as defined by cluster file sync level. </param>
+            <returns> the max of the existing and proposed candidateTermId. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.MemberId">
+            <summary>
+            Cluster member id either assigned statically or as the result of dynamic membership join.
+            </summary>
+            <returns> cluster member id either assigned statically or as the result of dynamic membership join. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.MemberId(System.Int32)">
+            <summary>
+            Member id assigned as part of dynamic join of a cluster.
+            </summary>
+            <param name="memberId"> assigned as part of dynamic join of a cluster. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.ClusterId">
+            <summary>
+            Identity of the cluster instance so multiple clusters can run on the same driver.
+            </summary>
+            <returns> id of the cluster instance so multiple clusters can run on the same driver. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.ClusterId(System.Int32)">
+            <summary>
+            Identity of the cluster instance so multiple clusters can run on the same driver.
+            </summary>
+            <param name="clusterId"> of the cluster instance so multiple clusters can run on the same driver. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.SignalReady">
+            <summary>
+            Signal the cluster component has concluded successfully and ready to start.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.SignalFailedStart">
+            <summary>
+            Signal the cluster component has failed to conclude and cannot start.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.UpdateActivityTimestamp(System.Int64)">
+            <summary>
+            Update the activity timestamp as a proof of life.
+            </summary>
+            <param name="nowMs"> activity timestamp as a proof of life. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.ActivityTimestampVolatile">
+            <summary>
+            Read the activity timestamp of the cluster component with volatile semantics.
+            </summary>
+            <returns> the activity timestamp of the cluster component with volatile semantics. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.Encoder">
+            <summary>
+            The encoder for writing the <seealso cref="T:Adaptive.Agrona.MarkFile"/> header.
+            </summary>
+            <returns> the encoder for writing the <seealso cref="T:Adaptive.Agrona.MarkFile"/> header. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.Decoder">
+            <summary>
+            The decoder for reading the <seealso cref="T:Adaptive.Agrona.MarkFile"/> header.
+            </summary>
+            <returns> the decoder for reading the <seealso cref="T:Adaptive.Agrona.MarkFile"/> header. </returns>
+        </member>
+        <member name="P:Adaptive.Cluster.ClusterMarkFile.ErrorBuffer">
+            <summary>
+            The direct buffer which wraps the region of the <seealso cref="T:Adaptive.Agrona.MarkFile"/> which contains the error log.
+            </summary>
+            <returns> the direct buffer which wraps the region of the <seealso cref="T:Adaptive.Agrona.MarkFile"/> which contains the error log. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.CheckHeaderLength(System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            Check if the header length is sufficient for encoding the provided properties.
+            </summary>
+            <param name="aeronDirectory"> for the media driver. </param>
+            <param name="controlChannel"> for the consensus module. </param>
+            <param name="ingressChannel"> from the cluster clients. </param>
+            <param name="serviceName">    for the application service. </param>
+            <param name="authenticator">  for the application service. </param>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.MarkFilenameForService(System.Int32)">
+            <summary>
+            The filename to be used for the mark file given a service id.
+            </summary>
+            <param name="serviceId"> of the service the <seealso cref="T:Adaptive.Cluster.ClusterMarkFile"/> represents. </param>
+            <returns> the filename to be used for the mark file given a service id. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.LoadControlProperties">
+            <summary>
+            The control properties for communicating between the consensus module and the services.
+            </summary>
+            <returns> the control properties for communicating between the consensus module and the services. </returns>
+        </member>
+        <member name="M:Adaptive.Cluster.ClusterMarkFile.ToString">
+            <summary>
+            {@inheritDoc}
+            </summary>
+        </member>
+    </members>
+</doc>

@@ -1,0 +1,17 @@
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\bin\Debug\netstandard2.0\Adaptive.Aeron.deps.json
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\bin\Debug\netstandard2.0\Adaptive.Aeron.dll
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\bin\Debug\netstandard2.0\Adaptive.Aeron.pdb
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\bin\Debug\netstandard2.0\Adaptive.Aeron.xml
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\bin\Debug\netstandard2.0\Adaptive.Agrona.dll
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\bin\Debug\netstandard2.0\Adaptive.Agrona.pdb
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\bin\Debug\netstandard2.0\Adaptive.Agrona.xml
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.csproj.AssemblyReference.cache
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.GeneratedMSBuildEditorConfig.editorconfig
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.AssemblyInfoInputs.cache
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.AssemblyInfo.cs
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.csproj.CoreCompileInputs.cache
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.csproj.Fody.CopyLocal.cache
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.csproj.CopyComplete
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.dll
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.xml
+C:\Davidp\Aeron.NET-master\src\Adaptive.Aeron\obj\Debug\netstandard2.0\Adaptive.Aeron.pdb

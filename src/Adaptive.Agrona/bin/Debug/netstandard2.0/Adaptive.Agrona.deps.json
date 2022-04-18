@@ -1,0 +1,92 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.0/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.0": {},
+    ".NETStandard,Version=v2.0/": {
+      "Adaptive.Agrona/1.37.0": {
+        "dependencies": {
+          "Fody": "6.6.0",
+          "NETStandard.Library": "2.0.3",
+          "System.Runtime.CompilerServices.Unsafe": "6.0.0",
+          "Virtuosity.Fody": "3.1.1"
+        },
+        "runtime": {
+          "Adaptive.Agrona.dll": {}
+        }
+      },
+      "Fody/6.6.0": {},
+      "Microsoft.NETCore.Platforms/1.1.0": {},
+      "NETStandard.Library/2.0.3": {
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "System.Runtime.CompilerServices.Unsafe/6.0.0": {
+        "runtime": {
+          "lib/netstandard2.0/System.Runtime.CompilerServices.Unsafe.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        }
+      },
+      "Virtuosity.Fody/3.1.1": {
+        "dependencies": {
+          "Fody": "6.6.0",
+          "NETStandard.Library": "2.0.3"
+        },
+        "runtime": {
+          "lib/netstandard1.0/Virtuosity.dll": {
+            "assemblyVersion": "3.1.1.0",
+            "fileVersion": "3.1.1.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Adaptive.Agrona/1.37.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Fody/6.6.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-NWWM8KiR9DGiAi47q9px9oI27xYBiM5KXxSnI4R5mz2/rG8LIcXJfw5zDLLH1xOgzqRNJgc8KTPQPoiQCidYUw==",
+      "path": "fody/6.6.0",
+      "hashPath": "fody.6.6.0.nupkg.sha512"
+    },
+    "Microsoft.NETCore.Platforms/1.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-kz0PEW2lhqygehI/d6XsPCQzD7ff7gUJaVGPVETX611eadGsA3A877GdSlU0LRVMCTH/+P3o2iDTak+S08V2+A==",
+      "path": "microsoft.netcore.platforms/1.1.0",
+      "hashPath": "microsoft.netcore.platforms.1.1.0.nupkg.sha512"
+    },
+    "NETStandard.Library/2.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-st47PosZSHrjECdjeIzZQbzivYBJFv6P2nv4cj2ypdI204DO+vZ7l5raGMiX4eXMJ53RfOIg+/s4DHVZ54Nu2A==",
+      "path": "netstandard.library/2.0.3",
+      "hashPath": "netstandard.library.2.0.3.nupkg.sha512"
+    },
+    "System.Runtime.CompilerServices.Unsafe/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/iUeP3tq1S0XdNNoMz5C9twLSrM/TH+qElHkXWaPvuNOt+99G75NrV0OS2EqHx5wMN7popYjpc8oTjC1y16DLg==",
+      "path": "system.runtime.compilerservices.unsafe/6.0.0",
+      "hashPath": "system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
+    },
+    "Virtuosity.Fody/3.1.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-9hRCOHW+LFj00F+0y1djfjz7y860TA58hjumqlD3rvjc3xJF4Bj+wl0FIOssGnZpc8kP/Zs1GI+cLz0xFPG5zQ==",
+      "path": "virtuosity.fody/3.1.1",
+      "hashPath": "virtuosity.fody.3.1.1.nupkg.sha512"
+    }
+  }
+}

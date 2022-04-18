@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "dgSpecHash": "wsx87ZsvVS8W0kyvLuzuKTzPOBOhX3GaZyvXHS/PJvFQsnUb76ZE1wpRr/RiliQxHPizP2Z8hh5AYkhr7Usofg==",
+  "success": true,
+  "projectFilePath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Aeron\\Adaptive.Aeron.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\davidp\\.nuget\\packages\\fody\\6.6.0\\fody.6.6.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\virtuosity.fody\\3.1.1\\virtuosity.fody.3.1.1.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\agrona\\1.37.0\\agrona.1.37.0.nupkg.sha512"
+  ],
+  "logs": []
+}

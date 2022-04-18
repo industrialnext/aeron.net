@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "qX9/P1Qqoa4DrIU52OfJ64Exfez2sXjte5zORCR5xl0YropSJYZNnkmX0mQf063/8aCkwUwtROxqZ8ISKdiLwg==",
+  "success": true,
+  "projectFilePath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Cluster\\Adaptive.Cluster.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\aeron.client\\1.37.0\\aeron.client.1.37.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\agrona\\1.37.0\\agrona.1.37.0.nupkg.sha512"
+  ],
+  "logs": []
+}

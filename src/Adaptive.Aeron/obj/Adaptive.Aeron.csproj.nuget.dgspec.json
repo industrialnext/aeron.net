@@ -1,0 +1,164 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Aeron\\Adaptive.Aeron.csproj": {}
+  },
+  "projects": {
+    "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Aeron\\Adaptive.Aeron.csproj": {
+      "version": "1.37.0",
+      "restore": {
+        "projectUniqueName": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Aeron\\Adaptive.Aeron.csproj",
+        "projectName": "Aeron.Client",
+        "projectPath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Aeron\\Adaptive.Aeron.csproj",
+        "packagesPath": "C:\\Users\\davidp\\.nuget\\packages\\",
+        "outputPath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Aeron\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
+          "C:\\Program Files (x86)\\Microsoft\\Xamarin\\NuGet\\"
+        ],
+        "configFilePaths": [
+          "C:\\Davidp\\Aeron.NET-master\\src\\NuGet.Config",
+          "C:\\Users\\davidp\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Xamarin.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.0": {
+            "targetAlias": "netstandard2.0",
+            "projectReferences": {
+              "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Agrona\\Adaptive.Agrona.csproj": {
+                "projectPath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Agrona\\Adaptive.Agrona.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "netstandard2.0": {
+          "targetAlias": "netstandard2.0",
+          "dependencies": {
+            "Fody": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[6.6.0, )"
+            },
+            "NETStandard.Library": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.0.3, )",
+              "autoReferenced": true
+            },
+            "Virtuosity.Fody": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[3.1.1, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\5.0.407\\RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Agrona\\Adaptive.Agrona.csproj": {
+      "version": "1.37.0",
+      "restore": {
+        "projectUniqueName": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Agrona\\Adaptive.Agrona.csproj",
+        "projectName": "Agrona",
+        "projectPath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Agrona\\Adaptive.Agrona.csproj",
+        "packagesPath": "C:\\Users\\davidp\\.nuget\\packages\\",
+        "outputPath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Agrona\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
+          "C:\\Program Files (x86)\\Microsoft\\Xamarin\\NuGet\\"
+        ],
+        "configFilePaths": [
+          "C:\\Davidp\\Aeron.NET-master\\src\\NuGet.Config",
+          "C:\\Users\\davidp\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Xamarin.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netstandard2.0": {
+            "targetAlias": "netstandard2.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "netstandard2.0": {
+          "targetAlias": "netstandard2.0",
+          "dependencies": {
+            "Fody": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[6.6.0, )"
+            },
+            "NETStandard.Library": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.0.3, )",
+              "autoReferenced": true
+            },
+            "System.Runtime.CompilerServices.Unsafe": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            },
+            "Virtuosity.Fody": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[3.1.1, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\5.0.407\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

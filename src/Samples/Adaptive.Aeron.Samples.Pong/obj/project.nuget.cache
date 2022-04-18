@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "dgSpecHash": "xxKVaQ/PH1kBdrjneWDFh562reGRNy+jb1vF3RQoccgeqUMNCVc5SoNHIpAZrlRJHddAfLiERzU454UIvjTWRg==",
+  "success": true,
+  "projectFilePath": "C:\\Davidp\\Aeron.NET-master\\src\\Samples\\Adaptive.Aeron.Samples.Pong\\Adaptive.Aeron.Samples.Pong.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\davidp\\.nuget\\packages\\hardwareinformation\\5.0.0\\hardwareinformation.5.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\5.0.0-rc.2.20475.5\\microsoft.extensions.logging.abstractions.5.0.0-rc.2.20475.5.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.netcore.platforms\\3.1.0\\microsoft.netcore.platforms.3.1.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.win32.registry\\4.7.0\\microsoft.win32.registry.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.win32.systemevents\\4.7.0\\microsoft.win32.systemevents.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.codedom\\4.7.0\\system.codedom.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.configuration.configurationmanager\\4.7.0\\system.configuration.configurationmanager.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.diagnostics.performancecounter\\4.7.0\\system.diagnostics.performancecounter.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.drawing.common\\4.7.0\\system.drawing.common.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.management\\4.7.0\\system.management.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.security.accesscontrol\\4.7.0\\system.security.accesscontrol.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.security.cryptography.protecteddata\\4.7.0\\system.security.cryptography.protecteddata.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.security.permissions\\4.7.0\\system.security.permissions.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.security.principal.windows\\4.7.0\\system.security.principal.windows.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.windows.extensions\\4.7.0\\system.windows.extensions.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\vulkansharp\\0.1.10\\vulkansharp.0.1.10.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\aeron.client\\1.37.0\\aeron.client.1.37.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\agrona\\1.37.0\\agrona.1.37.0.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,103 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.0/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.0": {},
+    ".NETStandard,Version=v2.0/": {
+      "Adaptive.Cluster/1.37.0": {
+        "dependencies": {
+          "Aeron.Archiver": "1.37.0",
+          "Aeron.Client": "1.37.0",
+          "NETStandard.Library": "2.0.3"
+        },
+        "runtime": {
+          "Adaptive.Cluster.dll": {}
+        }
+      },
+      "Microsoft.NETCore.Platforms/1.1.0": {},
+      "NETStandard.Library/2.0.3": {
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "System.Runtime.CompilerServices.Unsafe/6.0.0": {
+        "runtime": {
+          "lib/netstandard2.0/System.Runtime.CompilerServices.Unsafe.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        }
+      },
+      "Aeron.Archiver/1.37.0": {
+        "dependencies": {
+          "Aeron.Client": "1.37.0"
+        },
+        "runtime": {
+          "Adaptive.Archiver.dll": {}
+        }
+      },
+      "Aeron.Client/1.37.0": {
+        "dependencies": {
+          "Agrona": "1.37.0"
+        },
+        "runtime": {
+          "Adaptive.Aeron.dll": {}
+        }
+      },
+      "Agrona/1.37.0": {
+        "dependencies": {
+          "System.Runtime.CompilerServices.Unsafe": "6.0.0"
+        },
+        "runtime": {
+          "Adaptive.Agrona.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Adaptive.Cluster/1.37.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.NETCore.Platforms/1.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-kz0PEW2lhqygehI/d6XsPCQzD7ff7gUJaVGPVETX611eadGsA3A877GdSlU0LRVMCTH/+P3o2iDTak+S08V2+A==",
+      "path": "microsoft.netcore.platforms/1.1.0",
+      "hashPath": "microsoft.netcore.platforms.1.1.0.nupkg.sha512"
+    },
+    "NETStandard.Library/2.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-st47PosZSHrjECdjeIzZQbzivYBJFv6P2nv4cj2ypdI204DO+vZ7l5raGMiX4eXMJ53RfOIg+/s4DHVZ54Nu2A==",
+      "path": "netstandard.library/2.0.3",
+      "hashPath": "netstandard.library.2.0.3.nupkg.sha512"
+    },
+    "System.Runtime.CompilerServices.Unsafe/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/iUeP3tq1S0XdNNoMz5C9twLSrM/TH+qElHkXWaPvuNOt+99G75NrV0OS2EqHx5wMN7popYjpc8oTjC1y16DLg==",
+      "path": "system.runtime.compilerservices.unsafe/6.0.0",
+      "hashPath": "system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
+    },
+    "Aeron.Archiver/1.37.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Aeron.Client/1.37.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Agrona/1.37.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

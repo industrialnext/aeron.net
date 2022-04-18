@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "dgSpecHash": "lFImA45QwmRQqgLXwhy0HC1k+qcgGylLc1fjcHa3E3npVPmQz+BXB7j6NaLoaEIwE5YD5n5YxgtEM0+irk/iLA==",
+  "success": true,
+  "projectFilePath": "C:\\Davidp\\Aeron.NET-master\\src\\Samples\\Adaptive.Aeron.Samples.Common\\Adaptive.Aeron.Samples.Common.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\davidp\\.nuget\\packages\\hardwareinformation\\5.0.0\\hardwareinformation.5.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\5.0.0-rc.2.20475.5\\microsoft.extensions.logging.abstractions.5.0.0-rc.2.20475.5.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.codedom\\4.7.0\\system.codedom.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.diagnostics.performancecounter\\4.7.0\\system.diagnostics.performancecounter.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.management\\4.7.0\\system.management.4.7.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\vulkansharp\\0.1.10\\vulkansharp.0.1.10.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\aeron.client\\1.37.0\\aeron.client.1.37.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\agrona\\1.37.0\\agrona.1.37.0.nupkg.sha512"
+  ],
+  "logs": []
+}

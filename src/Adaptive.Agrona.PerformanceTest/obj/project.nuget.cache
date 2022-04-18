@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "QEV25f4RvcUylbL1WvHzBnvCy2a6l/LKIaeQzYb0OSzg8ezQgQuq9dHd2HQB79CbtjAWJoMYMwnJtoZTMBYaFg==",
+  "success": true,
+  "projectFilePath": "C:\\Davidp\\Aeron.NET-master\\src\\Adaptive.Agrona.PerformanceTest\\Adaptive.Agrona.PerformanceTest.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\davidp\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\agrona\\1.37.0\\agrona.1.37.0.nupkg.sha512"
+  ],
+  "logs": []
+}

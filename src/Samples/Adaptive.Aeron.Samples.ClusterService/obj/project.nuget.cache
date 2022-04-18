@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "dvUMLckRyjb4Wc3Bkx2TTSO1tiQEVHIcvpoZUDX9VO9kJjqTGIVx0TWC2vi/BdcZYtBhqyO9i1K5HAbYYZISfg==",
+  "success": true,
+  "projectFilePath": "C:\\Davidp\\Aeron.NET-master\\src\\Samples\\Adaptive.Aeron.Samples.ClusterService\\Adaptive.Aeron.Samples.ClusterService.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\davidp\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\aeron.client\\1.37.0\\aeron.client.1.37.0.nupkg.sha512",
+    "C:\\Users\\davidp\\.nuget\\packages\\agrona\\1.37.0\\agrona.1.37.0.nupkg.sha512"
+  ],
+  "logs": []
+}

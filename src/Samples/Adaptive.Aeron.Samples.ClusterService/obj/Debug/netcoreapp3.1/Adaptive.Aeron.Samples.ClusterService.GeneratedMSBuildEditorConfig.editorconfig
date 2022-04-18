@@ -1,0 +1,3 @@
+is_global = true
+build_property.RootNamespace = Adaptive.Aeron.Samples.ClusterService
+build_property.ProjectDir = C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.ClusterService\

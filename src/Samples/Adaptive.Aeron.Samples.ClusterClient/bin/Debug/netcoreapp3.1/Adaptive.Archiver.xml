@@ -1,0 +1,2742 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Adaptive.Archiver</name>
+    </assembly>
+    <members>
+        <member name="T:Adaptive.Archiver.AeronArchive">
+            <summary>
+            Client for interacting with a local or remote Aeron Archive that records and replays message streams.
+            <para>
+            This client provides a simple interaction model which is mostly synchronous and may not be optimal.
+            The underlying components such as the <seealso cref="T:Adaptive.Archiver.ArchiveProxy"/> and the <seealso cref="M:Adaptive.Archiver.AeronArchive.ControlResponsePoller"/> or
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.RecordingDescriptorPoller"/> may be used directly if a more asynchronous interaction is required.
+            </para>
+            <para>
+            Note: This class is threadsafe but the lock can be elided for single threaded access via <seealso cref="M:Adaptive.Aeron.Aeron.Context.ClientLock(Adaptive.Agrona.Concurrent.ILock)"/>
+            being set to <seealso cref="T:Adaptive.Agrona.Concurrent.NoOpLock"/>.
+            </para>
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.NULL_TIMESTAMP">
+            <summary>
+            Represents a timestamp that has not been set. Can be used when the time is not known.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.NULL_POSITION">
+            <summary>
+            Represents a position that has not been set. Can be used when the position is not known.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.NULL_LENGTH">
+            <summary>
+            Represents a length that has not been set. If null length is provided then replay the whole recorded stream.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.NOT_CONNECTED_MSG">
+            <summary>
+            Indicates the client is no longer connected to an archive.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.SegmentFileBasePosition(System.Int64,System.Int64,System.Int32,System.Int32)">
+            <summary>
+            Position of the recorded stream at the base of a segment file. If a recording starts within a term
+            then the base position can be before the recording started.
+            </summary>
+            <param name="startPosition">     of the stream. </param>
+            <param name="position">          of the stream to calculate the segment base position from. </param>
+            <param name="termBufferLength">  of the stream. </param>
+            <param name="segmentFileLength"> which is a multiple of term length. </param>
+            <returns> the position of the recorded stream at the beginning of a segment file. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Dispose">
+            <summary>
+            Notify the archive that this control session is closed, so it can promptly release resources then close the
+            local resources associated with the client.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Connect">
+            <summary>
+            Connect to an Aeron archive using a default <seealso cref="T:Adaptive.Aeron.Aeron.Context"/>. This will create a control session.
+            </summary>
+            <returns> the newly created Aeron Archive client. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Connect(Adaptive.Archiver.AeronArchive.Context)">
+            <summary>
+            Connect to an Aeron archive by providing a <seealso cref="T:Adaptive.Aeron.Aeron.Context"/>. This will create a control session.
+            <para>
+            Before connecting <seealso cref="M:Adaptive.Aeron.Aeron.Context.Conclude"/> will be called.
+            If an exception occurs then <seealso cref="M:Adaptive.Aeron.Aeron.Context.Dispose"/> will be called.
+            
+            </para>
+            </summary>
+            <param name="ctx"> for connection configuration. </param>
+            <returns> the newly created Aeron Archive client. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ConnectAsync">
+            <summary>
+            Begin an attempt at creating a connection which can be completed by calling <seealso cref="M:Adaptive.Archiver.AeronArchive.AsyncConnect.Poll"/> until
+            it returns the client, before complete it will return null.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Archiver.AeronArchive.AsyncConnect"/> that can be polled for completion. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ConnectAsync(Adaptive.Archiver.AeronArchive.Context)">
+            <summary>
+            Begin an attempt at creating a connection which can be completed by calling <seealso cref="M:Adaptive.Archiver.AeronArchive.AsyncConnect.Poll"/> until
+            it returns the client, before complete it will return null.
+            </summary>
+            <param name="ctx"> for the archive connection. </param>
+            <returns> the <seealso cref="T:Adaptive.Archiver.AeronArchive.AsyncConnect"/> that can be polled for completion. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Ctx">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Aeron.Aeron.Context"/> used to connect this archive client.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Aeron.Aeron.Context"/> used to connect this archive client. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.LastCorrelationId">
+            <summary>
+            The last correlation id used for sending a request to the archive via method on this class.
+            </summary>
+            <returns> last correlation id used for sending a request to the archive. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ControlSessionId">
+            <summary>
+            The control session id allocated for this connection to the archive.
+            </summary>
+            <returns> control session id allocated for this connection to the archive. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Proxy">
+            <summary>
+            The <seealso cref="T:Adaptive.Archiver.ArchiveProxy"/> for send asynchronous messages to the connected archive.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Archiver.ArchiveProxy"/> for send asynchronous messages to the connected archive. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ControlResponsePoller">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.AeronArchive.ControlResponsePoller"/> for polling additional events on the control channel.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.AeronArchive.ControlResponsePoller"/> for polling additional events on the control channel. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.RecordingDescriptorPoller">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.AeronArchive.RecordingDescriptorPoller"/> for polling recording descriptors on the control channel.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.AeronArchive.RecordingDescriptorPoller"/> for polling recording descriptors on the control channel. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.RecordingSubscriptionDescriptorPoller">
+            <summary>
+            The <seealso cref="M:Adaptive.Archiver.AeronArchive.RecordingSubscriptionDescriptorPoller"/> for polling subscription descriptors on the control channel.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.AeronArchive.RecordingSubscriptionDescriptorPoller"/> for polling subscription descriptors on the control
+            channel. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse">
+            <summary>
+            Poll the response stream once for an error. If another message is present then it will be skipped over
+            so only call when not expecting another response. If not connected then return <see cref="F:Adaptive.Archiver.AeronArchive.NOT_CONNECTED_MSG"/>.
+            </summary>
+            <returns> the error String otherwise null if no error is found. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse">
+            <summary>
+            Check if an error has been returned for the control session, or if it is no longer connected, and then throw
+            a <seealso cref="T:Adaptive.Archiver.ArchiveException"/> if <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.ErrorHandler(Adaptive.Agrona.ErrorHandler)"/> is not set.
+            <para>
+            To check for an error response without raising an exception then try <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>.
+               
+            </para>
+            </summary>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.PollForRecordingSignals">
+            <summary>
+            Poll for <seealso cref="T:Adaptive.Archiver.Codecs.RecordingSignal"/>s for this session which will be dispatched to
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.RecordingSignalConsumer"/>.
+            </summary>
+            <returns> positive value if signals dispatched otherwise 0. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.AddRecordedPublication(System.String,System.Int32)">
+            <summary>
+            Add a <seealso cref="T:Adaptive.Aeron.Publication"/> and set it up to be recorded. If this is not the first,
+            i.e. <seealso cref="P:Adaptive.Aeron.Publication.IsOriginal"/> is true, then an <seealso cref="T:Adaptive.Archiver.ArchiveException"/>
+            will be thrown and the recording not initiated.
+            <para>
+            This is a sessionId specific recording.
+            
+            </para>
+            </summary>
+            <param name="channel">  for the publication. </param>
+            <param name="streamId"> for the publication. </param>
+            <returns> the <seealso cref="T:Adaptive.Aeron.Publication"/> ready for use. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.AddRecordedExclusivePublication(System.String,System.Int32)">
+            <summary>
+            Add an <seealso cref="T:Adaptive.Aeron.ExclusivePublication"/> and set it up to be recorded.
+            <para>
+            This is a sessionId specific recording.
+            
+            </para>
+            </summary>
+            <param name="channel">  for the publication. </param>
+            <param name="streamId"> for the publication. </param>
+            <returns> the <seealso cref="T:Adaptive.Aeron.ExclusivePublication"/> ready for use. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StartRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)">
+            <summary>
+            Start recording a channel and stream pairing.
+            <para>
+            Channels that include sessionId parameters are considered different from channels without sessionIds. If a
+            publication matches both a sessionId specific channel recording and a non-sessionId specific recording,
+            it will be recorded twice.
+              
+            </para>
+            </summary>
+            <param name="channel">        to be recorded. </param>
+            <param name="streamId">       to be recorded. </param>
+            <param name="sourceLocation"> of the publication to be recorded. </param>
+            <returns> the subscriptionId, i.e. <seealso cref="P:Adaptive.Aeron.Subscription.RegistrationId"/>, of the recording. This can be
+            passed to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopRecording(System.Int64)"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StartRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation,System.Boolean)">
+            <summary>
+            Start recording a channel and stream pairing.
+            <para>
+            Channels that include sessionId parameters are considered different fom channels without sessionIds. If a
+            publication matches both a sessionId specific channel recording and a non-sessionId specific recording,
+            it will be recorded twice.
+               
+            </para>
+            </summary>
+            <param name="channel">        to be recorded. </param>
+            <param name="streamId">       to be recorded. </param>
+            <param name="sourceLocation"> of the publication to be recorded. </param>
+            <param name="autoStop">       if the recording should be automatically stopped when complete. </param>
+            <returns> the subscriptionId, i.e. <seealso cref="P:Adaptive.Aeron.Subscription.RegistrationId"/>, of the recording. This can be
+            passed to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopRecording(System.Int64)"/>. However, if is autoStop is true then no need to stop the recording
+            unless you want to abort early. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ExtendRecording(System.Int64,System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)">
+            <summary>
+            Extend an existing, non-active recording of a channel and stream pairing.
+            <para>
+            The channel must be configured for the initial position from which it will be extended. This can be done
+            with <seealso cref="M:Adaptive.Aeron.ChannelUriStringBuilder.InitialPosition(System.Int64,System.Int32,System.Int32)"/>. The details required to initialise can
+            be found by calling <seealso cref="M:Adaptive.Archiver.AeronArchive.ListRecording(System.Int64,Adaptive.Archiver.IRecordingDescriptorConsumer)"/>.
+            
+            </para>
+            </summary>
+            <param name="recordingId">    of the existing recording. </param>
+            <param name="channel">        to be recorded. </param>
+            <param name="streamId">       to be recorded. </param>
+            <param name="sourceLocation"> of the publication to be recorded. </param>
+            <returns> the subscriptionId, i.e. <seealso cref="P:Adaptive.Aeron.Subscription.RegistrationId"/>, of the recording. This can be
+            passed to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopRecording(System.Int64)"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ExtendRecording(System.Int64,System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation,System.Boolean)">
+            <summary>
+            Extend an existing, non-active recording of a channel and stream pairing.
+            <para>
+            The channel must be configured for the initial position from which it will be extended. This can be done
+            with <seealso cref="M:Adaptive.Aeron.ChannelUriStringBuilder.InitialPosition(System.Int64,System.Int32,System.Int32)"/>. The details required to initialise can
+            be found by calling <seealso cref="M:Adaptive.Archiver.AeronArchive.ListRecording(System.Int64,Adaptive.Archiver.IRecordingDescriptorConsumer)"/>.
+               
+            </para>
+            </summary>
+            <param name="recordingId">    of the existing recording. </param>
+            <param name="channel">        to be recorded. </param>
+            <param name="streamId">       to be recorded. </param>
+            <param name="sourceLocation"> of the publication to be recorded. </param>
+            <param name="autoStop">       if the recording should be automatically stopped when complete. </param>
+            <returns> the subscriptionId, i.e. <seealso cref="P:Adaptive.Aeron.Subscription.RegistrationId"/>, of the recording. This can be
+            passed to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopRecording(System.Int64)"/>. However, if is autoStop is true then no need to stop the recording
+            unless you want to abort early. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StopRecording(System.String,System.Int32)">
+            <summary>
+            Stop recording for a channel and stream pairing.
+            <para>
+            Channels that include sessionId parameters are considered different from channels without sessionIds. Stopping
+            a recording on a channel without a sessionId parameter will not stop the recording of any sessionId specific
+            recordings that use the same channel and streamId.
+              
+            </para>
+            </summary>
+            <param name="channel">  to stop recording for. </param>
+            <param name="streamId"> to stop recording for. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.TryStopRecording(System.String,System.Int32)">
+            <summary>
+            Try to stop a recording for a channel and stream pairing.
+            <para>
+            Channels that include sessionId parameters are considered different than channels without sessionIds. Stopping
+            a recording on a channel without a sessionId parameter will not stop the recording of any sessionId specific
+            recordings that use the same channel and streamId.
+               
+            </para>
+            </summary>
+            <param name="channel">  to stop recording for. </param>
+            <param name="streamId"> to stop recording for. </param>
+            <returns> true if the recording was stopped or false if the subscription is not currently active. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StopRecording(System.Int64)">
+            <summary>
+            Stop recording for a subscriptionId that has been returned from
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.StartRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)"/> or
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.ExtendRecording(System.Int64,System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)"/>.
+            </summary>
+            <param name="subscriptionId"> is the <see cref="P:Adaptive.Aeron.Subscription.RegistrationId"/> was registered with for the recording. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.TryStopRecording(System.Int64)">
+            <summary>
+            Try stop a recording for a subscriptionId that has been returned from
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.StartRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)"/> or
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.ExtendRecording(System.Int64,System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)"/>.
+            </summary>
+            <param name="subscriptionId"> is the <seealso cref="P:Adaptive.Aeron.Subscription.RegistrationId"/> for the recording in the archive. </param>
+            <returns> true if the recording was stopped or false if the subscription is not currently active. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.TryStopRecordingByIdentity(System.Int64)">
+            <summary>
+            Try stop an active recording by its recording id.
+            </summary>
+            <param name="recordingId"> for which active recording should be stopped. </param>
+            <returns> true if the recording was stopped or false if the recording is not currently active. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StopRecording(Adaptive.Aeron.Publication)">
+            <summary>
+            Stop recording a sessionId specific recording that pertains to the given <seealso cref="T:Adaptive.Aeron.Publication"/>.
+            </summary>
+            <param name="publication"> to stop recording for. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StartReplay(System.Int64,System.Int64,System.Int64,System.String,System.Int32)">
+             <summary>
+             Start a replay for a length in bytes of a recording from a position. If the position is <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/>
+             then the stream will be replayed from the start.
+            
+             The lower 32-bits of the returned value contains the <see cref="P:Adaptive.Aeron.Image.SessionId"/> of the received replay. All
+             64-bits are required to uniquely identify the replay when calling <see cref="M:Adaptive.Archiver.AeronArchive.StopReplay(System.Int64)"/>. The lower 32-bits
+             can be obtained by casting the <see cref="T:System.Int64"/> value to an <see cref="T:System.Int32"/>.
+             
+             </summary>
+             <param name="recordingId">    to be replayed. </param>
+             <param name="position">       from which the replay should begin or <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> if from the start. </param>
+             <param name="length">         of the stream to be replayed. Use <seealso cref="F:System.Int64.MaxValue"/> to follow a live recording or <see cref="F:Adaptive.Archiver.AeronArchive.NULL_LENGTH"/> to replay the whole stream of unknown length. </param>
+             <param name="replayChannel">  to which the replay should be sent. </param>
+             <param name="replayStreamId"> to which the replay should be sent. </param>
+             <returns> the id of the replay session which will be the same as the <seealso cref="P:Adaptive.Aeron.Image.SessionId"/> of the received
+             replay for correlation with the matching channel and stream id in the lower 32 bits. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StartBoundedReplay(System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.Int32)">
+            <summary>
+            Start a replay for a length in bytes of a recording from a position bounded by a position counter.
+            If the position is <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> then the stream will be replayed from the start.
+            <para>
+            The lower 32-bits of the returned value contains the <seealso cref="P:Adaptive.Aeron.Image.SessionId"/> of the received replay. All
+            64-bits are required to uniquely identify the replay when calling <seealso cref="M:Adaptive.Archiver.AeronArchive.StopReplay(System.Int64)"/>. The lower 32-bits
+            can be obtained by casting the {@code long} value to an {@code int}.
+                
+            </para>
+            </summary>
+            <param name="recordingId">       to be replayed. </param>
+            <param name="position">          from which the replay should begin or <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> if from the start. </param>
+            <param name="length">            of the stream to be replayed. Use <seealso cref="F:System.Int64.MaxValue"/> to follow a live recording or
+                                     <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_LENGTH"/> to replay the whole stream of unknown length. </param>
+            <param name="limitCounterId">    to use to bound replay. </param>
+            <param name="replayChannel">     to which the replay should be sent. </param>
+            <param name="replayStreamId">    to which the replay should be sent. </param>
+            <returns> the id of the replay session which will be the same as the <seealso cref="P:Adaptive.Aeron.Image.SessionId"/> of the received
+            replay for correlation with the matching channel and stream id in the lower 32 bits. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StopReplay(System.Int64)">
+            <summary>
+            Stop a replay session.
+            </summary>
+            <param name="replaySessionId"> to stop replay for. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StopAllReplays(System.Int64)">
+            <summary>
+            Stop all replay sessions for a given recording Id or all replays in general.
+            </summary>
+            <param name="recordingId"> to stop replay for or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> for all replays. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Replay(System.Int64,System.Int64,System.Int64,System.String,System.Int32)">
+            <summary>
+            Replay a length in bytes of a recording from a position and for convenience create a <seealso cref="T:Adaptive.Aeron.Subscription"/>
+            to receive the replay. If the position is <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> then the stream will be replayed from the start.
+            </summary>
+            <param name="recordingId">    to be replayed. </param>
+            <param name="position">       from which the replay should begin or <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> if from the start. </param>
+            <param name="length">         of the stream to be replayed or <seealso cref="F:System.Int64.MaxValue"/> to follow a live recording. </param>
+            <param name="replayChannel">  to which the replay should be sent. </param>
+            <param name="replayStreamId"> to which the replay should be sent. </param>
+            <returns> the <seealso cref="T:Adaptive.Aeron.Subscription"/> for consuming the replay. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Replay(System.Int64,System.Int64,System.Int64,System.String,System.Int32,Adaptive.Aeron.AvailableImageHandler,Adaptive.Aeron.UnavailableImageHandler)">
+            <summary>
+            Replay a length in bytes of a recording from a position and for convenience create a <seealso cref="T:Adaptive.Aeron.Subscription"/>
+            to receive the replay. If the position is <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> then the stream will be replayed from the start.
+            </summary>
+            <param name="recordingId">             to be replayed. </param>
+            <param name="position">                from which the replay should begin or <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> if from the start. </param>
+            <param name="length">                  of the stream to be replayed or <seealso cref="F:System.Int64.MaxValue"/> to follow a live recording. </param>
+            <param name="replayChannel">           to which the replay should be sent. </param>
+            <param name="replayStreamId">          to which the replay should be sent. </param>
+            <param name="availableImageHandler">   to be called when the replay image becomes available. </param>
+            <param name="unavailableImageHandler"> to be called when the replay image goes unavailable. </param>
+            <returns> the <seealso cref="T:Adaptive.Aeron.Subscription"/> for consuming the replay. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ListRecordings(System.Int64,System.Int32,Adaptive.Archiver.IRecordingDescriptorConsumer)">
+            <summary>
+            List all recording descriptors from a recording id with a limit of record count.
+            <para>
+            If the recording id is greater than the largest known id then nothing is returned.
+            
+            </para>
+            </summary>
+            <param name="fromRecordingId"> at which to begin the listing. </param>
+            <param name="recordCount">     to limit for each query. </param>
+            <param name="consumer">        to which the descriptors are dispatched. </param>
+            <returns> the number of descriptors found and consumed. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ListRecordingsForUri(System.Int64,System.Int32,System.String,System.Int32,Adaptive.Archiver.IRecordingDescriptorConsumer)">
+            <summary>
+            List recording descriptors from a recording id with a limit of record count for a given channelFragment and stream id.
+            <para>
+            If the recording id is greater than the largest known id then nothing is returned.
+            
+            </para>
+            </summary>
+            <param name="fromRecordingId"> at which to begin the listing. </param>
+            <param name="recordCount">     to limit for each query. </param>
+            <param name="channelFragment"> for a contains match on the original channel stored with the archive descriptor. </param>
+            <param name="streamId">        to match. </param>
+            <param name="consumer">        to which the descriptors are dispatched. </param>
+            <returns> the number of descriptors found and consumed. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ListRecording(System.Int64,Adaptive.Archiver.IRecordingDescriptorConsumer)">
+            <summary>
+            List a recording descriptor for a single recording id.
+            <para>
+            If the recording id is greater than the largest known id then nothing is returned.
+            
+            </para>
+            </summary>
+            <param name="recordingId"> at which to begin the listing. </param>
+            <param name="consumer">    to which the descriptors are dispatched. </param>
+            <returns> the number of descriptors found and consumed. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.GetStartPosition(System.Int64)">
+            <summary>
+            Get the start position for a recording.
+            </summary>
+            <param name="recordingId"> of the recording for which the position is required. </param>
+            <returns> the start position of a recording. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.GetStopPosition(System.Int64)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.GetRecordingPosition(System.Int64)">
+            <summary>
+            Get the position recorded for an active recording. If no active recording the return <see cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/>
+            </summary>
+            <param name="recordingId"> of the active recording for which the position is required. </param>
+            <returns> the recorded position for the active recording or <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> if recording not active. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.GetStopPosition(System.Int64)"/>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.GetStopPosition(System.Int64)">
+            <summary>
+            Get the stop position for a recording.
+            </summary>
+            <param name="recordingId"> of the active recording for which the position is required. </param>
+            <returns> the stop position, or <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> if still active. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.GetRecordingPosition(System.Int64)"/>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.FindLastMatchingRecording(System.Int64,System.String,System.Int32,System.Int32)">
+            <summary>
+            Find the last recording that matches the given criteria.
+            </summary>
+            <param name="minRecordingId">  to search back to. </param>
+            <param name="channelFragment"> for a contains match on the stripped channel stored with the archive descriptor </param>
+            <param name="streamId">        of the recording to match. </param>
+            <param name="sessionId">       of the recording to match. </param>
+            <returns> the recordingId if found otherwise <see cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if not found. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.TruncateRecording(System.Int64,System.Int64)">
+            <summary>
+            Truncate a stopped recording to a given position that is less than the stopped position. The provided position
+            must be on a fragment boundary. Truncating a recording to the start position effectively deletes the recording.
+            
+            If the truncate operation will result in deleting segments then this will occur asynchronously. Before extending
+            a truncated recording which has segments being asynchronously being deleted then you should await completion
+            on the <seealso cref="F:Adaptive.Archiver.Codecs.RecordingSignal.DELETE"/>.
+            </summary>
+            <param name="recordingId"> of the stopped recording to be truncated. </param>
+            <param name="position">    to which the recording will be truncated. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.PurgeRecording(System.Int64)">
+            <summary>
+            Purge a stopped recording, i.e. mark recording as <seealso cref="F:Adaptive.Archiver.Codecs.RecordingState.INVALID"/>
+            and delete the corresponding segment files. The space in the Catalog will be reclaimed upon compaction.
+            </summary>
+            <param name="recordingId"> of the stopped recording to be purged. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.ListRecordingSubscriptions(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,Adaptive.Archiver.IRecordingSubscriptionDescriptorConsumer)">
+            <summary>
+            List active recording subscriptions in the archive. These are the result of requesting one of
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.StartRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)"/> or a
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.ExtendRecording(System.Int64,System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation)"/>. The returned subscription id can be used for
+            passing to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopRecording(System.Int64)"/>.
+            </summary>
+            <param name="pseudoIndex">       in the active list at which to begin for paging. </param>
+            <param name="subscriptionCount"> to get in a listing. </param>
+            <param name="channelFragment">   to do a contains match on the stripped channel URI. Empty string is match all. </param>
+            <param name="streamId">          to match on the subscription. </param>
+            <param name="applyStreamId">     true if the stream id should be matched. </param>
+            <param name="consumer">          for the matched subscription descriptors. </param>
+            <returns> the count of matched subscriptions. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Replicate(System.Int64,System.Int64,System.Int32,System.String,System.String)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>. Follow progress with <seealso cref="T:Adaptive.Archiver.RecordingSignalAdapter"/>.
+              
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <returns> return the replication session id which can be passed later to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopReplication(System.Int64)"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Replicate(System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.String,System.String)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>. Follow progress with <seealso cref="T:Adaptive.Archiver.RecordingSignalAdapter"/>.
+            </para>
+            <para>
+            Stop recording this stream when the position of the destination reaches the specified stop position.
+               
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="stopPosition">       position to stop the replication. <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> to stop at end
+                                      of current recording. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <param name="replicationChannel"> channel over which the replication will occur. Empty or null for default channel. </param>
+            <returns> return the replication session id which can be passed later to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopReplication(System.Int64)"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.TaggedReplicate(System.Int64,System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.String)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated. The subscription used in the archive will be tagged with the provided tags.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>. Follow progress with <seealso cref="T:Adaptive.Archiver.RecordingSignalAdapter"/>.
+            
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="channelTagId">       used to tag the replication subscription. </param>
+            <param name="subscriptionTagId">  used to tag the replication subscription. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <returns> return the replication session id which can be passed later to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopReplication(System.Int64)"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.TaggedReplicate(System.Int64,System.Int64,System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.String,System.String)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated. The subscription used in the archive will be tagged with the provided tags.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>. Follow progress with <seealso cref="T:Adaptive.Archiver.RecordingSignalAdapter"/>.
+                
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="stopPosition">       position to stop the replication. <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> to stop at end
+                                      of current recording. </param>
+            <param name="channelTagId">       used to tag the replication subscription. </param>
+            <param name="subscriptionTagId">  used to tag the replication subscription. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <param name="replicationChannel"> channel over which the replication will occur. Empty or null for default channel. </param>
+            <returns> return the replication session id which can be passed later to <seealso cref="M:Adaptive.Archiver.AeronArchive.StopReplication(System.Int64)"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.StopReplication(System.Int64)">
+            <summary>
+            Stop a replication session by id returned from <seealso cref="M:Adaptive.Archiver.AeronArchive.Replicate(System.Int64,System.Int64,System.Int32,System.String,System.String)"/>.
+            </summary>
+            <param name="replicationId"> to stop replication for. </param>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.Replicate(System.Int64,System.Int64,System.Int32,System.String,System.String)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.TryStopReplication(System.Int64)">
+            <summary>
+            Attempt to stop a replication session by id returned from <seealso cref="M:Adaptive.Archiver.AeronArchive.Replicate(System.Int64,System.Int64,System.Int32,System.String,System.String)"/>.
+            </summary>
+            <param name="replicationId"> to stop replication for. </param>
+            <returns> true if the replication was stopped, false if the replication is not active. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.Replicate(System.Int64,System.Int64,System.Int32,System.String,System.String)"/>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.DetachSegments(System.Int64,System.Int64)">
+            <summary>
+            Detach segments from the beginning of a recording up to the provided new start position.
+            <para>
+            The new start position must be first byte position of a segment after the existing start position.
+            </para>
+            <para>
+            It is not possible to detach segments which are active for recording or being replayed.
+            
+            </para>
+            </summary>
+            <param name="recordingId">      to which the operation applies. </param>
+            <param name="newStartPosition"> for the recording after the segments are detached. </param>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.SegmentFileBasePosition(System.Int64,System.Int64,System.Int32,System.Int32)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.DeleteDetachedSegments(System.Int64)">
+            <summary>
+            Delete segments which have been previously detached from a recording.
+            </summary>
+            <param name="recordingId"> to which the operation applies. </param>
+            <returns> count of deleted segment files. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.DetachSegments(System.Int64,System.Int64)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.PurgeSegments(System.Int64,System.Int64)">
+            <summary>
+            Purge (detach and delete) segments from the beginning of a recording up to the provided new start position.
+            <para>
+            The new start position must be first byte position of a segment after the existing start position.
+            </para>
+            <para>
+            It is not possible to detach segments which are active for recording or being replayed.
+            
+            </para>
+            </summary>
+            <param name="recordingId">      to which the operation applies. </param>
+            <param name="newStartPosition"> for the recording after the segments are detached. </param>
+            <returns> count of deleted segment files. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.DetachSegments(System.Int64,System.Int64)"></seealso>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.DeleteDetachedSegments(System.Int64)"></seealso>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.SegmentFileBasePosition(System.Int64,System.Int64,System.Int32,System.Int32)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.AttachSegments(System.Int64)">
+            <summary>
+            Attach segments to the beginning of a recording to restore history that was previously detached.
+            <para>
+            Segment files must match the existing recording and join exactly to the start position of the recording
+            they are being attached to.
+            
+            </para>
+            </summary>
+            <param name="recordingId"> to which the operation applies. </param>
+            <returns> count of attached segment files. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.DetachSegments(System.Int64,System.Int64)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.MigrateSegments(System.Int64,System.Int64)">
+            <summary>
+            Migrate segments from a source recording and attach them to the beginning of a destination recording.
+            <para>
+            The source recording must match the destination recording for segment length, term length, mtu length,
+            stream id, plus the stop position and term id of the source must join with the start position of the
+            destination and be on a segment boundary.
+            </para>
+            <para>
+            The source recording will be effectively truncated back to its start position after the migration.
+            
+            </para>
+            </summary>
+            <param name="srcRecordingId"> source recording from which the segments will be migrated. </param>
+            <param name="dstRecordingId"> destination recording to which the segments will be attached. </param>
+            <returns> count of attached segment files. </returns>
+        </member>
+        <member name="T:Adaptive.Archiver.AeronArchive.Configuration">
+            <summary>
+            Common configuration properties for communicating with an Aeron archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.PROTOCOL_MAJOR_VERSION">
+            <summary>
+            Major version of the network protocol from client to archive. If these don't match then client and archive
+            are not compatible.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.PROTOCOL_MINOR_VERSION">
+            <summary>
+            Minor version of the network protocol from client to archive. If these don't match then some features may
+            not be available.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.PROTOCOL_PATCH_VERSION">
+            <summary>
+            Patch version of the network protocol from client to archive. If these don't match then bug fixes may not
+            have been applied.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.PROTOCOL_SEMANTIC_VERSION">
+            <summary>
+            Combined semantic version for the archive control protocol.
+            </summary>
+            <seealso cref="T:Adaptive.Agrona.SemanticVersion"/>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.MESSAGE_TIMEOUT_PROP_NAME">
+            <summary>
+            Timeout in nanoseconds when waiting on a message to be sent or received.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.MESSAGE_TIMEOUT_DEFAULT_NS">
+            <summary>
+            Timeout when waiting on a message to be sent or received.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_PROP_NAME">
+            <summary>
+            Channel for sending control messages to an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_DEFAULT">
+            <summary>
+            Channel for sending control messages to an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for sending control messages to an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT">
+            <summary>
+            Stream id within a channel for sending control messages to an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_CHANNEL_PROP_NAME">
+            <summary>
+            Channel for sending control messages to a driver local archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_CHANNEL_DEFAULT">
+            <summary>
+            Channel for sending control messages to a driver local archive. Default to IPC.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for sending control messages to a driver local archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_STREAM_ID_DEFAULT">
+            <summary>
+            Stream id within a channel for sending control messages to a driver local archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_PROP_NAME">
+            <summary>
+            Channel for receiving control response messages from an archive.
+            
+            <para>
+            Channel's <em>endpoint</em> can be specified explicitly (i.e. by providing address and port pair) or
+            by using zero as a port number. Here is an example of valid response channels:
+            <ul>
+                <li>{@code aeron:udp?endpoint=localhost:8020} - listen on port {@code 8020} on localhost.</li>
+                <li>{@code aeron:udp?endpoint=192.168.10.10:8020} - listen on port {@code 8020} on
+                {@code 192.168.10.10}.</li>
+                <li>{@code aeron:udp?endpoint=localhost:0} - in this case the port is unspecified and the OS
+                will assign a free port from the
+                <a href="https://en.wikipedia.org/wiki/Ephemeral_port">ephemeral port range</a>.</li>
+            </ul>
+            </para>
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_DEFAULT">
+            <summary>
+            Default channel for receiving control response messages from an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for receiving control messages from an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_DEFAULT">
+            <summary>
+            Stream id within a channel for receiving control messages from an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_CHANNEL_PROP_NAME">
+            <summary>
+            Channel for receiving progress events of recordings from an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_CHANNEL_DEFAULT">
+            <summary>
+            Channel for receiving progress events of recordings from an archive.
+            For production it is recommended that multicast or dynamic multi-destination-cast (MDC) is used to allow
+            for dynamic subscribers, an endpoint can be added to the subscription side for controlling port usage.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_STREAM_ID_PROP_NAME">
+            <summary>
+            Stream id within a channel for receiving progress of recordings from an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_STREAM_ID_DEFAULT">
+            <summary>
+            Stream id within a channel for receiving progress of recordings from an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_ENABLED_PROP_NAME">
+            <summary>
+            Is channel enabled for recording progress events of recordings from an archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_ENABLED_DEFAULT">
+            <summary>
+            Channel enabled for recording progress events of recordings from an archive which defaults to true.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_SPARSE_PROP_NAME">
+            <summary>
+            Sparse term buffer indicator for control streams.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_SPARSE_DEFAULT">
+            <summary>
+            Overrides driver's sparse term buffer indicator for control streams.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_LENGTH_PROP_NAME">
+            <summary>
+            Term length for control streams.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_LENGTH_DEFAULT">
+            <summary>
+            Low term length for control channel reflects expected low bandwidth usage.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_MTU_LENGTH_PROP_NAME">
+            <summary>
+            MTU length for control streams.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_MTU_LENGTH_DEFAULT">
+            <summary>
+             MTU to reflect default for the control streams.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.AeronArchive.Configuration.NO_OP_RECORDING_SIGNAL_CONSUMER">
+            <summary>
+            Default no operation <seealso cref="T:Adaptive.Archiver.IRecordingSignalConsumer"/> to be used when not set explicitly.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.MessageTimeoutNs">
+            <summary>
+            The timeout in nanoseconds to wait for a message.
+            </summary>
+            <returns> timeout in nanoseconds to wait for a message. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.MESSAGE_TIMEOUT_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.ControlTermBufferSparse">
+            <summary>
+            Should term buffer files be sparse for control request and response streams.
+            </summary>
+            <returns> true if term buffer files should be sparse for control request and response streams. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_SPARSE_PROP_NAME"/>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.ControlTermBufferLength">
+            <summary>
+            Term buffer length to be used for control request and response streams.
+            </summary>
+            <returns> term buffer length to be used for control request and response streams. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_LENGTH_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.ControlMtuLength">
+            <summary>
+            MTU length to be used for control request and response streams.
+            </summary>
+            <returns> MTU length to be used for control request and response streams. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_MTU_LENGTH_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.ControlChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.ControlStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.LocalControlChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.LocalControlStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.LOCAL_CONTROL_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.ControlResponseChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.ControlResponseStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.RecordingEventsChannel">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_CHANNEL_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_CHANNEL_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_CHANNEL_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.RecordingEventsStreamId">
+            <summary>
+            The value <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_STREAM_ID_PROP_NAME"/> if set.
+            </summary>
+            <returns> <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_STREAM_ID_DEFAULT"/> or system property
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_STREAM_ID_PROP_NAME"/> if set. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Configuration.RecordingEventsEnabled">
+            <summary>
+            Should the recording events stream be enabled.
+            </summary>
+            <returns> true if the recording events stream be enabled. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.RECORDING_EVENTS_ENABLED_PROP_NAME"></seealso>
+        </member>
+        <member name="T:Adaptive.Archiver.AeronArchive.Context">
+             <summary>
+             Specialised configuration options for communicating with an Aeron Archive.
+            
+             The context will be owned by <see cref="T:Adaptive.Archiver.AeronArchive"/> after a successful
+             <see cref="M:Adaptive.Archiver.AeronArchive.Connect(Adaptive.Archiver.AeronArchive.Context)"/> and closed via <see cref="M:Adaptive.Archiver.AeronArchive.Dispose"/>
+             </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.Conclude">
+            <summary>
+            Conclude configuration by setting up defaults when specifics are not provided.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.MessageTimeoutNs(System.Int64)">
+            <summary>
+            Set the message timeout in nanoseconds to wait for sending or receiving a message.
+            </summary>
+            <param name="messageTimeoutNs"> to wait for sending or receiving a message. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.MESSAGE_TIMEOUT_PROP_NAME"/>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.MessageTimeoutNs">
+            <summary>
+            The message timeout in nanoseconds to wait for sending or receiving a message.
+            </summary>
+            <returns> the message timeout in nanoseconds to wait for sending or receiving a message. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.MESSAGE_TIMEOUT_PROP_NAME"/>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.RecordingEventsChannel">
+            <summary>
+            Get the channel URI on which the recording events publication will publish.
+            </summary>
+            <returns> the channel URI on which the recording events publication will publish. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.RecordingEventsChannel(System.String)">
+            <summary>
+            Set the channel URI on which the recording events publication will publish.
+            <para>
+            To support dynamic subscribers then this can be set to multicast or MDC (Multi-Destination-Cast) if
+            multicast cannot be supported for on the available the network infrastructure.
+            
+            </para>
+            </summary>
+            <param name="recordingEventsChannel"> channel URI on which the recording events publication will publish. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Aeron.Aeron.Context.MDC_CONTROL_PARAM_NAME"/>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.RecordingEventsStreamId">
+            <summary>
+            Get the stream id on which the recording events publication will publish.
+            </summary>
+            <returns> the stream id on which the recording events publication will publish. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.RecordingEventsStreamId(System.Int32)">
+            <summary>
+            Set the stream id on which the recording events publication will publish.
+            </summary>
+            <param name="recordingEventsStreamId"> stream id on which the recording events publication will publish. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlRequestChannel(System.String)">
+            <summary>
+            Set the channel parameter for the control request channel.
+            </summary>
+            <param name="channel"> parameter for the control request channel. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlRequestChannel">
+            <summary>
+            Get the channel parameter for the control request channel.
+            </summary>
+            <returns> the channel parameter for the control request channel. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlRequestStreamId(System.Int32)">
+            <summary>
+            Set the stream id for the control request channel.
+            </summary>
+            <param name="streamId"> for the control request channel. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlRequestStreamId">
+            <summary>
+            Get the stream id for the control request channel.
+            </summary>
+            <returns> the stream id for the control request channel. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlResponseChannel(System.String)">
+            <summary>
+            Set the channel parameter for the control response channel.
+            </summary>
+            <param name="channel"> parameter for the control response channel. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_PROP_NAME"></seealso>s
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlResponseChannel">
+            <summary>
+            Get the channel parameter for the control response channel.
+            </summary>
+            <returns> the channel parameter for the control response channel. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_CHANNEL_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlResponseStreamId(System.Int32)">
+            <summary>
+            Set the stream id for the control response channel.
+            </summary>
+            <param name="streamId"> for the control response channel. </param>
+            <returns> this for a fluent API </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlResponseStreamId">
+            <summary>
+            Get the stream id for the control response channel.
+            </summary>
+            <returns> the stream id for the control response channel. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_RESPONSE_STREAM_ID_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlTermBufferSparse(System.Boolean)">
+            <summary>
+            Should the control streams use sparse file term buffers.
+            </summary>
+            <param name="controlTermBufferSparse"> for the control stream. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_SPARSE_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlTermBufferSparse">
+            <summary>
+            Should the control streams use sparse file term buffers.
+            </summary>
+            <returns> true if the control stream should use sparse file term buffers. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_SPARSE_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlTermBufferLength(System.Int32)">
+            <summary>
+            Set the term buffer length for the control streams.
+            </summary>
+            <param name="controlTermBufferLength"> for the control stream. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_LENGTH_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlTermBufferLength">
+            <summary>
+            Get the term buffer length for the control streams.
+            </summary>
+            <returns> the term buffer length for the control streams. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_TERM_BUFFER_LENGTH_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlMtuLength(System.Int32)">
+            <summary>
+            Set the MTU length for the control streams.
+            </summary>
+            <param name="controlMtuLength"> for the control streams. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_MTU_LENGTH_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ControlMtuLength">
+            <summary>
+            Get the MTU length for the control steams.
+            </summary>
+            <returns> the MTU length for the control steams. </returns>
+            <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.CONTROL_MTU_LENGTH_PROP_NAME"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.IdleStrategy(Adaptive.Agrona.Concurrent.IIdleStrategy)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> used when waiting for responses.
+            </summary>
+            <param name="idleStrategy"> used when waiting for responses. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.IdleStrategy">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> used when waiting for responses.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> used when waiting for responses. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.AeronDirectoryName(System.String)">
+            <summary>
+            Set the top level Aeron directory used for communication between the Aeron client and Media Driver.
+            </summary>
+            <param name="aeronDirectoryName"> the top level Aeron directory. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.AeronDirectoryName">
+            <summary>
+            Get the top level Aeron directory used for communication between the Aeron client and Media Driver.
+            </summary>
+            <returns> The top level Aeron directory. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.AeronClient(Adaptive.Aeron.Aeron)">
+            <summary>
+            <seealso cref="T:Adaptive.Aeron.Aeron"/> client for communicating with the local Media Driver.
+            <para>
+            This client will be closed when the <seealso cref="M:Adaptive.Archiver.AeronArchive.Dispose"/> or <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.Dispose"/> methods are called if
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.OwnsAeronClient"/> is true.
+            
+            </para>
+            </summary>
+            <param name="aeron"> client for communicating with the local Media Driver. </param>
+            <returns> this for a fluent API. </returns>
+            <seealso cref="M:Adaptive.Aeron.Aeron.Connect"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.AeronClient">
+            <summary>
+            <seealso cref="T:Adaptive.Aeron.Aeron"/> client for communicating with the local Media Driver.
+            <para>
+            If not provided then a default will be established during <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.Conclude"/> by calling
+            <seealso cref="M:Adaptive.Aeron.Aeron.Connect"/>.
+            
+            </para>
+            </summary>
+            <returns> client for communicating with the local Media Driver. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.OwnsAeronClient(System.Boolean)">
+            <summary>
+            Does this context own the <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.AeronClient"/> client and thus take responsibility for closing it?
+            </summary>
+            <param name="ownsAeronClient"> does this context own the <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.AeronClient"/> client? </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.OwnsAeronClient">
+            <summary>
+            Does this context own the <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.AeronClient"/> client and thus take responsibility for closing it?
+            </summary>
+            <returns> does this context own the <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.AeronClient"/> client and thus take responsibility for closing it? </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.Lock(Adaptive.Agrona.Concurrent.ILock)">
+            <summary>
+            The <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.Lock"/> that is used to provide mutual exclusion in the <seealso cref="T:Adaptive.Archiver.AeronArchive"/> client.
+            <para>
+            If the <seealso cref="T:Adaptive.Archiver.AeronArchive"/> is used from only a single thread then the lock can be set to
+            <seealso cref="T:Adaptive.Agrona.Concurrent.NoOpLock"/> to elide the lock overhead.
+            
+            </para>
+            </summary>
+            <param name="lock"> that is used to provide mutual exclusion in the <seealso cref="T:Adaptive.Archiver.AeronArchive"/> client. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.Lock">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.Lock"/> that is used to provide mutual exclusion in the <seealso cref="T:Adaptive.Archiver.AeronArchive"/> client.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.Lock"/> that is used to provide mutual exclusion in the <seealso cref="T:Adaptive.Archiver.AeronArchive"/> client. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ErrorHandler(Adaptive.Agrona.ErrorHandler)">
+            <summary>
+            Handle errors returned asynchronously from the archive for a control session.
+            </summary>
+            <param name="errorHandler"> method to handle objects of type Throwable. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ErrorHandler">
+            <summary>
+            Get the error handler that will be called for asynchronous errors.
+            </summary>
+            <returns> the error handler that will be called for asynchronous errors. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.CredentialsSupplier(Adaptive.Aeron.Security.ICredentialsSupplier)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Aeron.Security.ICredentialsSupplier"/> to be used for authentication with the archive.
+            </summary>
+            <param name="credentialsSupplier"> to be used for authentication with the archive. </param>
+            <returns> this for fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.RecordingSignalConsumer(Adaptive.Archiver.IRecordingSignalConsumer)">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Archiver.IRecordingSignalConsumer"/> to will be called  when polling for responses from an Archive.
+            </summary>
+            <param name="recordingSignalConsumer"> to called with recording signal events. </param>
+            <returns> this for a fluent API. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.RecordingSignalConsumer">
+            <summary>
+            Set the <seealso cref="T:Adaptive.Archiver.IRecordingSignalConsumer"/> to will be called  when polling for responses from an Archive.
+            </summary>
+            <returns> a recording signal consumer. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.CredentialsSupplier">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Aeron.Security.ICredentialsSupplier"/> to be used for authentication with the archive.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Aeron.Security.ICredentialsSupplier"/> to be used for authentication with the archive. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.Dispose">
+            <summary>
+            Close the context and free applicable resources.
+            <para>
+            If <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.OwnsAeronClient"/> is true then the <seealso cref="M:Adaptive.Archiver.AeronArchive.Context.AeronClient"/> client will be closed.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.Context.ToString">
+            <summary>
+            {@inheritDoc}
+            </summary>
+        </member>
+        <member name="T:Adaptive.Archiver.AeronArchive.AsyncConnect">
+            <summary>
+            Allows for the async establishment of a archive session.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.AsyncConnect.Dispose">
+            <summary>
+            Close any allocated resources.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.AsyncConnect.Ctx">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Archiver.AeronArchive.Context"/> used for this client.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Archiver.AeronArchive.Context"/> used for this client. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.AsyncConnect.Step">
+            <summary>
+            Get the index of the current step.
+            </summary>
+            <returns> the index of the current step. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.AeronArchive.AsyncConnect.Poll">
+            <summary>
+            Poll for a complete connection.
+            </summary>
+            <exception cref="T:System.InvalidOperationException"></exception>
+            <returns> a new <seealso cref="T:Adaptive.Archiver.AeronArchive"/> if successfully connected otherwise null. </returns>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.GENERIC">
+            <summary>
+            Generic archive error with detail likely in the message.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.ACTIVE_LISTING">
+            <summary>
+            An active listing of recordings is currently in operation on the session.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.ACTIVE_RECORDING">
+            <summary>
+            The recording is currently active so the requested operation is not valid.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.ACTIVE_SUBSCRIPTION">
+            <summary>
+            A subscription is currently active for the requested channel and stream id which would clash.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.UNKNOWN_SUBSCRIPTION">
+            <summary>
+            The subscription for the requested operation is not known to the archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.UNKNOWN_RECORDING">
+            <summary>
+            The recording identity for the operation is not know to the archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.UNKNOWN_REPLAY">
+            <summary>
+            The replay identity for the operation is not known to the archive.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.MAX_REPLAYS">
+            <summary>
+            The archive has reached its maximum concurrent replay sessions.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.MAX_RECORDINGS">
+            <summary>
+            The archive has reached its maximum concurrent recording sessions.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.INVALID_EXTENSION">
+            <summary>
+            The extend-recording operation is not valid for the existing recording.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.AUTHENTICATION_REJECTED">
+            <summary>
+            The archive is rejecting the session because of failed authentication.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.STORAGE_SPACE">
+            <summary>
+            The archive storage is at minimum threshold or exhausted.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveException.UNKNOWN_REPLICATION">
+            <summary>
+            The replication identity for this operation is not known to the archive.
+            </summary>
+        </member>
+        <member name="P:Adaptive.Archiver.ArchiveException.ErrorCode">
+            <summary>
+            Error code providing more detail into what went wrong.
+            </summary>
+            <returns> code providing more detail into what went wrong. </returns>
+        </member>
+        <member name="P:Adaptive.Archiver.ArchiveException.CorrelationId">
+            <summary>
+            Optional correlation-id associated with a control protocol request. Will be <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if
+            not set.
+            </summary>
+            <returns> correlation-id associated with a control protocol request. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveException.#ctor">
+            <summary>
+            Default ArchiveException exception as <seealso cref="F:Adaptive.Aeron.Exceptions.Category.ERROR"/> and
+            <seealso cref="P:Adaptive.Archiver.ArchiveException.ErrorCode"/> = <seealso cref="F:Adaptive.Archiver.ArchiveException.GENERIC"/>.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveException.#ctor(System.String)">
+            <summary>
+            ArchiveException exception as <seealso cref="F:Adaptive.Aeron.Exceptions.Category.ERROR"/> and
+            <seealso cref="P:Adaptive.Archiver.ArchiveException.ErrorCode"/> = <seealso cref="F:Adaptive.Archiver.ArchiveException.GENERIC"/>, plus detail.
+            </summary>
+            <param name="message"> providing detail. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveException.#ctor(System.String,System.Int32)">
+            <summary>
+            ArchiveException exception as <seealso cref="F:Adaptive.Aeron.Exceptions.Category.ERROR"/>, plus detail and
+            error code.
+            </summary>
+            <param name="message">   providing detail. </param>
+            <param name="errorCode"> for type. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveException.#ctor(System.String,System.Int32,System.Int64)">
+            <summary>
+            ArchiveException exception as <seealso cref="F:Adaptive.Aeron.Exceptions.Category.ERROR"/>, plus detail, error code,
+            and correlation if of the control request.
+            </summary>
+            <param name="message">       providing detail. </param>
+            <param name="errorCode">     for type. </param>
+            <param name="correlationId"> of the control request. </param>
+        </member>
+        <member name="F:Adaptive.Archiver.ArchiveProxy.DEFAULT_RETRY_ATTEMPTS">
+            <summary>
+            Default number of retry attempts to be made when offering requests.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.#ctor(Adaptive.Aeron.Publication)">
+            <summary>
+            Create a proxy with a <seealso cref="M:Adaptive.Archiver.ArchiveProxy.Pub"/> for sending control message requests.
+            <para>
+            This provides a default <seealso cref="T:Adaptive.Agrona.Concurrent.IIdleStrategy"/> of a <seealso cref="T:Adaptive.Agrona.Concurrent.YieldingIdleStrategy"/> when offers are back pressured
+            with a defaults of <seealso cref="F:Adaptive.Archiver.AeronArchive.Configuration.MESSAGE_TIMEOUT_DEFAULT_NS"/> and
+            <seealso cref="F:Adaptive.Archiver.ArchiveProxy.DEFAULT_RETRY_ATTEMPTS"/>.
+            
+            </para>
+            </summary>
+            <param name="publication"> publication for sending control messages to an archive. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.#ctor(Adaptive.Aeron.Publication,Adaptive.Agrona.Concurrent.IIdleStrategy,Adaptive.Agrona.Concurrent.INanoClock,System.Int64,System.Int32,Adaptive.Aeron.Security.ICredentialsSupplier)">
+            <summary>
+            Create a proxy with a <seealso cref="M:Adaptive.Archiver.ArchiveProxy.Pub"/> for sending control message requests.
+            </summary>
+            <param name="publication">         publication for sending control messages to an archive. </param>
+            <param name="retryIdleStrategy">   for what should happen between retry attempts at offering messages. </param>
+            <param name="nanoClock">           to be used for calculating checking deadlines. </param>
+            <param name="connectTimeoutNs">    for connection requests. </param>
+            <param name="retryAttempts">       for offering control messages before giving up. </param>
+            <param name="credentialsSupplier"> for the AuthConnectRequest </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.Pub">
+            <summary>
+            Get the <seealso cref="T:Adaptive.Aeron.Publication"/> used for sending control messages.
+            </summary>
+            <returns> the <seealso cref="T:Adaptive.Aeron.Publication"/> used for sending control messages. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.Connect(System.String,System.Int32,System.Int64)">
+            <summary>
+            Connect to an archive on its control interface providing the response stream details.
+            </summary>
+            <param name="responseChannel">  for the control message responses. </param>
+            <param name="responseStreamId"> for the control message responses. </param>
+            <param name="correlationId">    for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.TryConnect(System.String,System.Int32,System.Int64)">
+            <summary>
+            Try and connect to an archive on its control interface providing the response stream details. Only one attempt will
+            be made to offer the request.
+            </summary>
+            <param name="responseChannel">  for the control message responses. </param>
+            <param name="responseStreamId"> for the control message responses. </param>
+            <param name="correlationId">    for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.Connect(System.String,System.Int32,System.Int64,Adaptive.Agrona.Concurrent.AgentInvoker)">
+            <summary>
+            Connect to an archive on its control interface providing the response stream details.
+            </summary>
+            <param name="responseChannel">    for the control message responses. </param>
+            <param name="responseStreamId">   for the control message responses. </param>
+            <param name="correlationId">      for this request. </param>
+            <param name="aeronClientInvoker"> for aeron client conductor thread. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.KeepAlive(System.Int64,System.Int64)">
+            <summary>
+            Keep this archive session alive by notifying the archive.
+            </summary>
+            <param name="controlSessionId"> with the archive. </param>
+            <param name="correlationId">    for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.CloseSession(System.Int64)">
+            <summary>
+            Close this control session with the archive.
+            </summary>
+            <param name="controlSessionId"> with the archive. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.TryChallengeResponse(System.Byte[],System.Int64,System.Int64)">
+            <summary>
+            Try and send a ChallengeResponse to an archive on its control interface providing the credentials. Only one
+            attempt will be made to offer the request.
+            </summary>
+            <param name="encodedCredentials"> to send. </param>
+            <param name="correlationId">      for this response. </param>
+            <param name="controlSessionId">   for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StartRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation,System.Int64,System.Int64)">
+            <summary>
+            Start recording streams for a given channel and stream id pairing.
+            </summary>
+            <param name="channel">          to be recorded. </param>
+            <param name="streamId">         to be recorded. </param>
+            <param name="sourceLocation">   of the publication to be recorded. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StartRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation,System.Boolean,System.Int64,System.Int64)">
+            <summary>
+            Start recording streams for a given channel and stream id pairing.
+            </summary>
+            <param name="channel">          to be recorded. </param>
+            <param name="streamId">         to be recorded. </param>
+            <param name="sourceLocation">   of the publication to be recorded. </param>
+            <param name="autoStop">         if the recording should be automatically stopped when complete. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StopRecording(System.String,System.Int32,System.Int64,System.Int64)">
+            <summary>
+            Stop an active recording.
+            </summary>
+            <param name="channel">          to be stopped. </param>
+            <param name="streamId">         to be stopped. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StopRecording(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Stop a recording by the <seealso cref="P:Adaptive.Aeron.Subscription.RegistrationId"/> it was registered with.
+            </summary>
+            <param name="subscriptionId">   that identifies the subscription in the archive doing the recording. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StopRecordingByIdentity(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Stop an active recording by the recording id. This is not the <seealso cref="P:Adaptive.Aeron.Subscription.RegistrationId"/>.
+            </summary>
+            <param name="recordingId">      that identifies a recording in the archive. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.Replay(System.Int64,System.Int64,System.Int64,System.String,System.Int32,System.Int64,System.Int64)">
+            <summary>
+            Replay a recording from a given position.
+            </summary>
+            <param name="recordingId">      to be replayed. </param>
+            <param name="position">         from which the replay should be started. </param>
+            <param name="length">           of the stream to be replayed. Use <seealso cref="F:System.Int64.MaxValue"/> to follow a live stream. </param>
+            <param name="replayChannel">    to which the replay should be sent. </param>
+            <param name="replayStreamId">   to which the replay should be sent. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.BoundedReplay(System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.Int32,System.Int64,System.Int64)">
+            <summary>
+            Replay a recording from a given position bounded by a position counter.
+            </summary>
+            <param name="recordingId">      to be replayed. </param>
+            <param name="position">         from which the replay should be started. </param>
+            <param name="length">           of the stream to be replayed. Use <seealso cref="F:System.Int64.MaxValue"/> to follow a live stream. </param>
+            <param name="limitCounterId">   to use as the replay bound. </param>
+            <param name="replayChannel">    to which the replay should be sent. </param>
+            <param name="replayStreamId">   to which the replay should be sent. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StopReplay(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Stop an existing replay session.
+            </summary>
+            <param name="replaySessionId">  that should be stopped. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StopAllReplays(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Stop any existing replay sessions for recording Id or all replay sessions regardless of recording Id.
+            </summary>
+            <param name="recordingId">      that should be stopped. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.ListRecordings(System.Int64,System.Int32,System.Int64,System.Int64)">
+            <summary>
+            List a range of recording descriptors.
+            </summary>
+            <param name="fromRecordingId">  at which to begin listing. </param>
+            <param name="recordCount">      for the number of descriptors to be listed. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.ListRecordingsForUri(System.Int64,System.Int32,System.String,System.Int32,System.Int64,System.Int64)">
+            <summary>
+            List a range of recording descriptors which match a channel URI fragment and stream id.
+            </summary>
+            <param name="fromRecordingId">  at which to begin listing. </param>
+            <param name="recordCount">      for the number of descriptors to be listed. </param>
+            <param name="channelFragment">  to match recordings on from the original channel URI in the archive descriptor. </param>
+            <param name="streamId">         to match recordings on. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.ListRecording(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            List a recording descriptor for a given recording id.
+            </summary>
+            <param name="recordingId">      at which to begin listing. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.ExtendRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation,System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Extend an existing, non-active, recorded stream for the same channel and stream id.
+            <para>
+            The channel must be configured for the initial position from which it will be extended. This can be done
+            with <seealso cref="M:Adaptive.Aeron.ChannelUriStringBuilder.InitialPosition(System.Int64,System.Int32,System.Int32)"/>. The details required to initialise can
+            be found by calling <seealso cref="M:Adaptive.Archiver.ArchiveProxy.ListRecording(System.Int64,System.Int64,System.Int64)"/>.
+            
+            </para>
+            </summary>
+            <param name="channel">          to be recorded. </param>
+            <param name="streamId">         to be recorded. </param>
+            <param name="sourceLocation">   of the publication to be recorded. </param>
+            <param name="recordingId">      to be extended. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.ExtendRecording(System.String,System.Int32,Adaptive.Archiver.Codecs.SourceLocation,System.Boolean,System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Extend an existing, non-active, recorded stream for a the same channel and stream id.
+            <para>
+            The channel must be configured for the initial position from which it will be extended. This can be done
+            with <seealso cref="M:Adaptive.Aeron.ChannelUriStringBuilder.InitialPosition(System.Int64,System.Int32,System.Int32)"/>. The details required to initialise can
+            be found by calling <seealso cref="M:Adaptive.Archiver.ArchiveProxy.ListRecording(System.Int64,System.Int64,System.Int64)"/>.
+            
+            </para>
+            </summary>
+            <param name="channel">          to be recorded. </param>
+            <param name="streamId">         to be recorded. </param>
+            <param name="sourceLocation">   of the publication to be recorded. </param>
+            <param name="autoStop">         if the recording should be automatically stopped when complete. </param>
+            <param name="recordingId">      to be extended. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.GetRecordingPosition(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Get the recorded position of an active recording.
+            </summary>
+            <param name="recordingId">      of the active recording that the position is being requested for. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.TruncateRecording(System.Int64,System.Int64,System.Int64,System.Int64)">
+             <summary>
+             Truncate a stopped recording to a given position that is less than the stopped position. The provided position
+             must be on a fragment boundary. Truncating a recording to the start position effectively deletes the recording.
+            
+             If the truncate operation will result in deleting segments then this will occur asynchronously. Before extending
+             a truncated recording which has segments being asynchronously being deleted then you should await completion
+             on the <seealso cref="F:Adaptive.Archiver.Codecs.RecordingSignal.DELETE"/>.
+             </summary>
+             <param name="recordingId">      of the stopped recording to be truncated. </param>
+             <param name="position">         to which the recording will be truncated. </param>
+             <param name="correlationId">    for this request. </param>
+             <param name="controlSessionId"> for this request. </param>
+             <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.PurgeRecording(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Purge a stopped recording, i.e. mark recording as <seealso cref="F:Adaptive.Archiver.Codecs.RecordingState.INVALID"/>
+            and delete the corresponding segment files. The space in the Catalog will be reclaimed upon compaction.
+            </summary>
+            <param name="recordingId">      of the stopped recording to be purged. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.GetStartPosition(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Get the start position of a recording.
+            </summary>
+            <param name="recordingId">      of the recording that the position is being requested for. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.GetStopPosition(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Get the stop position of a recording.
+            </summary>
+            <param name="recordingId">      of the recording that the stop position is being requested for. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.FindLastMatchingRecording(System.Int64,System.String,System.Int32,System.Int32,System.Int64,System.Int64)">
+            <summary>
+            Find the last recording that matches the given criteria.
+            </summary>
+            <param name="minRecordingId">   to search back to. </param>
+            <param name="channelFragment">  for a contains match on the original channel stored with the archive descriptor. </param>
+            <param name="streamId">         of the recording to match. </param>
+            <param name="sessionId">        of the recording to match. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.ListRecordingSubscriptions(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int64,System.Int64)">
+            <summary>
+            List registered subscriptions in the archive which have been used to record streams.
+            </summary>
+            <param name="pseudoIndex">       in the list of active recording subscriptions. </param>
+            <param name="subscriptionCount"> for the number of descriptors to be listed. </param>
+            <param name="channelFragment">   for a contains match on the stripped channel used with the registered subscription. </param>
+            <param name="streamId">          for the subscription. </param>
+            <param name="applyStreamId">     when matching. </param>
+            <param name="correlationId">     for this request. </param>
+            <param name="controlSessionId">  for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.Replicate(System.Int64,System.Int64,System.Int32,System.String,System.String,System.Int64,System.Int64)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>.
+            
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <param name="correlationId">      for this request. </param>
+            <param name="controlSessionId">   for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.Replicate(System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.String,System.String,System.Int64,System.Int64)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>.
+            
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="stopPosition">       position to stop the replication. <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> to stop at end
+                                      of current recording. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <param name="replicationChannel"> channel over which the replication will occur. Empty or null for default channel. </param>
+            <param name="correlationId">      for this request. </param>
+            <param name="controlSessionId">   for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.TaggedReplicate(System.Int64,System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.String,System.Int64,System.Int64)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated. The subscription used in the archive will be tagged with the provided tags.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>.
+            
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="channelTagId">       used to tag the replication subscription. </param>
+            <param name="subscriptionTagId">  used to tag the replication subscription. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <param name="correlationId">      for this request. </param>
+            <param name="controlSessionId">   for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.TaggedReplicate(System.Int64,System.Int64,System.Int64,System.Int64,System.Int64,System.Int32,System.String,System.String,System.String,System.Int64,System.Int64)">
+            <summary>
+            Replicate a recording from a source archive to a destination which can be considered a backup for a primary
+            archive. The source recording will be replayed via the provided replay channel and use the original stream id.
+            If the destination recording id is <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> then a new destination recording is created,
+            otherwise the provided destination recording id will be extended. The details of the source recording
+            descriptor will be replicated. The subscription used in the archive will be tagged with the provided tags.
+            <para>
+            For a source recording that is still active the replay can merge with the live stream and then follow it
+            directly and no longer require the replay from the source. This would require a multicast live destination.
+            </para>
+            <para>
+            Errors will be reported asynchronously and can be checked for with <seealso cref="M:Adaptive.Archiver.AeronArchive.PollForErrorResponse"/>
+            or <seealso cref="M:Adaptive.Archiver.AeronArchive.CheckForErrorResponse"/>.
+            
+            </para>
+            </summary>
+            <param name="srcRecordingId">     recording id which must exist in the source archive. </param>
+            <param name="dstRecordingId">     recording to extend in the destination, otherwise <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/>. </param>
+            <param name="stopPosition">       position to stop the replication. <seealso cref="F:Adaptive.Archiver.AeronArchive.NULL_POSITION"/> to stop at end
+                                      of current recording. </param>
+            <param name="channelTagId">       used to tag the replication subscription. </param>
+            <param name="subscriptionTagId">  used to tag the replication subscription. </param>
+            <param name="srcControlChannel">  remote control channel for the source archive to instruct the replay on. </param>
+            <param name="srcControlStreamId"> remote control stream id for the source archive to instruct the replay on. </param>
+            <param name="liveDestination">    destination for the live stream if merge is required. Empty or null for no merge. </param>
+            <param name="replicationChannel"> channel over which the replication will occur. Empty or null for default channel. </param>
+            <param name="correlationId">      for this request. </param>
+            <param name="controlSessionId">   for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.StopReplication(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Stop an active replication by the registration id it was registered with.
+            </summary>
+            <param name="replicationId">    that identifies the session in the archive doing the replication. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.DetachSegments(System.Int64,System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Detach segments from the beginning of a recording up to the provided new start position.
+            <para>
+            The new start position must be first byte position of a segment after the existing start position.
+            </para>
+            <para>
+            It is not possible to detach segments which are active for recording or being replayed.
+            
+            </para>
+            </summary>
+            <param name="recordingId">      to which the operation applies. </param>
+            <param name="newStartPosition"> for the recording after the segments are detached. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.SegmentFileBasePosition(System.Int64,System.Int64,System.Int32,System.Int32)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.DeleteDetachedSegments(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Delete segments which have been previously detached from a recording.
+            </summary>
+            <param name="recordingId">      to which the operation applies. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+            <seealso cref="M:Adaptive.Archiver.ArchiveProxy.DetachSegments(System.Int64,System.Int64,System.Int64,System.Int64)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.PurgeSegments(System.Int64,System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Purge (detach and delete) segments from the beginning of a recording up to the provided new start position.
+            <para>
+            The new start position must be first byte position of a segment after the existing start position.
+            </para>
+            <para>
+            It is not possible to purge segments which are active for recording or being replayed.
+            
+            </para>
+            </summary>
+            <param name="recordingId">      to which the operation applies. </param>
+            <param name="newStartPosition"> for the recording after the segments are detached. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+            <seealso cref="M:Adaptive.Archiver.ArchiveProxy.DetachSegments(System.Int64,System.Int64,System.Int64,System.Int64)"></seealso>
+            <seealso cref="M:Adaptive.Archiver.ArchiveProxy.DeleteDetachedSegments(System.Int64,System.Int64,System.Int64)"></seealso>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.SegmentFileBasePosition(System.Int64,System.Int64,System.Int32,System.Int32)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.AttachSegments(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Attach segments to the beginning of a recording to restore history that was previously detached.
+            <para>
+            Segment files must match the existing recording and join exactly to the start position of the recording
+            they are being attached to.
+            
+            </para>
+            </summary>
+            <param name="recordingId">      to which the operation applies. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+            <seealso cref="M:Adaptive.Archiver.ArchiveProxy.DetachSegments(System.Int64,System.Int64,System.Int64,System.Int64)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.ArchiveProxy.MigrateSegments(System.Int64,System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Migrate segments from a source recording and attach them to the beginning of a destination recording.
+            <para>
+            The source recording must match the destination recording for segment length, term length, mtu length,
+            stream id, plus the stop position and term id of the source must join with the start position of the destination
+            and be on a segment boundary.
+            </para>
+            <para>
+            The source recording will be effectively truncated back to its start position after the migration.
+            
+            </para>
+            </summary>
+            <param name="srcRecordingId">   source recording from which the segments will be migrated. </param>
+            <param name="dstRecordingId">   destination recording to which the segments will be attached. </param>
+            <param name="correlationId">    for this request. </param>
+            <param name="controlSessionId"> for this request. </param>
+            <returns> true if successfully offered otherwise false. </returns>
+        </member>
+        <member name="T:Adaptive.Archiver.IControlEventListener">
+            <summary>
+            Listener for responses to requests made on the archive control channel and async notification of errors which may
+            happen later.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.IControlEventListener.OnResponse(System.Int64,System.Int64,System.Int64,Adaptive.Archiver.Codecs.ControlResponseCode,System.String)">
+            <summary>
+            An event has been received from the Archive in response to a request with a given correlation id.
+            </summary>
+            <param name="controlSessionId"> of the originating session. </param>
+            <param name="correlationId">    of the associated request. </param>
+            <param name="relevantId">       of the object to which the response applies. </param>
+            <param name="code">             for the response status. </param>
+            <param name="errorMessage">     when is set if the response code is not OK. </param>
+        </member>
+        <member name="T:Adaptive.Archiver.ControlResponseAdapter">
+            <summary>
+            Encapsulate the polling, decoding, and dispatching of archive control protocol response messages.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponseAdapter.#ctor(Adaptive.Archiver.IControlResponseListener,Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Create an adapter for a given subscription to an archive for control response messages.
+            </summary>
+            <param name="controlResponseListener">      to which responses are dispatched. </param>
+            <param name="subscription">  to poll for new events. </param>
+            <param name="fragmentLimit"> to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponseAdapter.#ctor(Adaptive.Archiver.IControlResponseListener,Adaptive.Archiver.IRecordingSignalConsumer,Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Create an adapter for a given subscription to an archive for control response messages.
+            </summary>
+            <param name="controlResponseListener"> for dispatching responses. </param>
+            <param name="recordingSignalConsumer"> for dispatching recording signals. </param>
+            <param name="subscription">            to poll for responses. </param>
+            <param name="fragmentLimit">           to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponseAdapter.Poll">
+            <summary>
+            Poll for recording events and dispatch them to the <seealso cref="T:Adaptive.Archiver.IControlResponseListener"/> for this instance.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponseAdapter.DispatchDescriptor(Adaptive.Archiver.Codecs.RecordingDescriptorDecoder,Adaptive.Archiver.IRecordingDescriptorConsumer)">
+            <summary>
+            Dispatch a descriptor message to a consumer by reading the fields in the correct order.
+            </summary>
+            <param name="decoder">  which wraps the encoded message ready for reading. </param>
+            <param name="consumer"> to which the decoded fields should be passed. </param>
+        </member>
+        <member name="T:Adaptive.Archiver.ControlResponsePoller">
+            <summary>
+            Encapsulate the polling and decoding of archive control protocol response messages.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ControlResponsePoller.FRAGMENT_LIMIT">
+            <summary>
+            Limit to apply when polling response messages.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.#ctor(Adaptive.Aeron.Subscription)">
+            <summary>
+            Create a poller for a given subscription to an archive for control response messages with a default
+            fragment limit for polling as <seealso cref="F:Adaptive.Archiver.ControlResponsePoller.FRAGMENT_LIMIT"/>.
+            </summary>
+            <param name="subscription">  to poll for new events. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.#ctor(Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Create a poller for a given subscription to an archive for control response messages.
+            </summary>
+            <param name="subscription">  to poll for new events. </param>
+            <param name="fragmentLimit"> to apply when polling. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.Subscription">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.Subscription"/> used for polling responses.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.Subscription"/> used for polling responses. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.Poll">
+            <summary>
+            Poll for control response events.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.TemplateId">
+            <summary>
+            SBE template id of polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> SBE template id of polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.ControlSessionId">
+            <summary>
+            Control session id of polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> control session id of polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.CorrelationId">
+            <summary>
+            Correlation id of the message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> correlation id of polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.RelevantId">
+            <summary>
+            Get the relevant id returned with the response, e.g. replay session id.
+            </summary>
+            <returns> the relevant id returned with the response. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.RecordingId">
+            <summary>
+            Recording id of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> recording id of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.SubscriptionId">
+            <summary>
+            Subscription id of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> subscription id of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.Position">
+            <summary>
+            Position of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> position of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal">
+            <summary>
+            Enum of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or null if poll returned nothing.
+            </summary>
+            <returns> enum of polled <seealso cref="M:Adaptive.Archiver.ControlResponsePoller.RecordingSignal"/> or null if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.Version">
+            <summary>
+            Version response from the server in semantic version form.
+            </summary>
+            <returns> response from the server in semantic version form. </returns>
+        </member>
+        <member name="P:Adaptive.Archiver.ControlResponsePoller.PollComplete">
+            <summary>
+            Has the last polling action received a complete message?
+            </summary>
+            <returns> true if the last polling action received a complete message? </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.Code">
+            <summary>
+            Get the response code of the last response.
+            </summary>
+            <returns> the response code of the last response. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.ErrorMessage">
+            <summary>
+            Get the error message of the response.
+            </summary>
+            <returns> the error message of the response. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.WasChallenged">
+            <summary>
+            Was the last polling action received a challenge message?
+            </summary>
+            <returns> true if the last polling action received was a challenge message, false if not. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ControlResponsePoller.EncodedChallenge">
+            <summary>
+            Get the encoded challenge of the last challenge.
+            </summary>
+            <returns> the encoded challenge of the last challenge. </returns>
+        </member>
+        <member name="T:Adaptive.Archiver.IControlResponseListener">
+            <summary>
+            Interface for listening to events from the archive in response to requests.
+            </summary>
+        </member>
+        <member name="T:Adaptive.Archiver.IRecordingDescriptorConsumer">
+            <summary>
+            Consumer of events describing Aeron stream recordings.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.IRecordingDescriptorConsumer.OnRecordingDescriptor(System.Int64,System.Int64,System.Int64,System.Int64,System.Int64,System.Int64,System.Int64,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.String,System.String,System.String)">
+            <summary>
+            A recording descriptor returned as a result of requesting a listing of recordings.
+            </summary>
+            <param name="controlSessionId">  of the originating session requesting to list recordings. </param>
+            <param name="correlationId">     of the associated request to list recordings. </param>
+            <param name="recordingId">       of this recording descriptor. </param>
+            <param name="startTimestamp">    of the recording. </param>
+            <param name="stopTimestamp">     of the recording. </param>
+            <param name="startPosition">     of the recording against the recorded publication, the <seealso cref="P:Adaptive.Aeron.Image.JoinPosition"/>. </param>
+            <param name="stopPosition">      reached for the recording, final position for <seealso cref="P:Adaptive.Aeron.Image.Position"/>. </param>
+            <param name="initialTermId">     of the recorded stream, <seealso cref="P:Adaptive.Aeron.Image.InitialTermId"/>. </param>
+            <param name="segmentFileLength"> of the recording which is a multiple of termBufferLength. </param>
+            <param name="termBufferLength">  of the recorded stream, <seealso cref="P:Adaptive.Aeron.Image.TermBufferLength"/>. </param>
+            <param name="mtuLength">         of the recorded stream, <seealso cref="P:Adaptive.Aeron.Image.MtuLength"/>. </param>
+            <param name="sessionId">         of the recorded stream, this will be the most recent session id for extended recordings. </param>
+            <param name="streamId">          of the recorded stream, <seealso cref="P:Adaptive.Aeron.Subscription.StreamId"/>. </param>
+            <param name="strippedChannel">   of the recorded stream which is used for the recording subscription in the archive. </param>
+            <param name="originalChannel">   of the recorded stream provided to the start recording request, <seealso cref="P:Adaptive.Aeron.Subscription.Channel"/>. </param>
+            <param name="sourceIdentity">    of the recorded stream, the <seealso cref="P:Adaptive.Aeron.Image.SourceIdentity"/>. </param>
+        </member>
+        <member name="T:Adaptive.Archiver.IRecordingEventsListener">
+            <summary>
+            Event listener for observing the status of recordings for an Archive.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.IRecordingEventsListener.OnStart(System.Int64,System.Int64,System.Int32,System.Int32,System.String,System.String)">
+            <summary>
+            Fired when a recording is started.
+            </summary>
+            <param name="recordingId">    assigned to the new recording. </param>
+            <param name="startPosition">  in the stream at which the recording started. </param>
+            <param name="sessionId">      of the publication being recorded. </param>
+            <param name="streamId">       of the publication being recorded. </param>
+            <param name="channel">        of the publication being recorded. </param>
+            <param name="sourceIdentity"> of the publication being recorded. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.IRecordingEventsListener.OnProgress(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Progress indication of an active recording.
+            </summary>
+            <param name="recordingId">   for which progress is being reported. </param>
+            <param name="startPosition"> in the stream at which the recording started. </param>
+            <param name="position">      reached in recording the publication. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.IRecordingEventsListener.OnStop(System.Int64,System.Int64,System.Int64)">
+            <summary>
+            Fired when a recording is stopped.
+            </summary>
+            <param name="recordingId">   of the publication that has stopped recording. </param>
+            <param name="startPosition"> in the stream at which the recording started. </param>
+            <param name="stopPosition">  at which the recording stopped. </param>
+        </member>
+        <member name="T:Adaptive.Archiver.IRecordingSubscriptionDescriptorConsumer">
+            <summary>
+            Consumer for descriptors of active archive recording <seealso cref="T:Adaptive.Aeron.Subscription"/>s.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.IRecordingSubscriptionDescriptorConsumer.OnSubscriptionDescriptor(System.Int64,System.Int64,System.Int64,System.Int32,System.String)">
+            <summary>
+            Descriptor for an active recording subscription on the archive.
+            </summary>
+            <param name="controlSessionId"> for the request. </param>
+            <param name="correlationId">    for the request. </param>
+            <param name="subscriptionId">   that can be used to stop the recording subscription. </param>
+            <param name="streamId">         the subscription was registered with. </param>
+            <param name="strippedChannel">  the subscription was registered with. </param>
+        </member>
+        <member name="T:Adaptive.Archiver.RecordingDescriptorPoller">
+            <summary>
+            Encapsulate the polling, decoding, dispatching of recording descriptors from an archive.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.#ctor(Adaptive.Aeron.Subscription,Adaptive.Agrona.ErrorHandler,System.Int64,System.Int32)">
+            <summary>
+            Create a poller for a given subscription to an archive for control response messages.
+            </summary>
+            <param name="subscription">     to poll for new events. </param>
+            <param name="errorHandler">     to call for asynchronous errors. </param>
+            <param name="controlSessionId"> to filter the responses. </param>
+            <param name="fragmentLimit">    to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.#ctor(Adaptive.Aeron.Subscription,Adaptive.Agrona.ErrorHandler,Adaptive.Archiver.IRecordingSignalConsumer,System.Int64,System.Int32)">
+            <summary>
+            Create a poller for a given subscription to an archive for control response messages.
+            </summary>
+            <param name="subscription">     to poll for new events. </param>
+            <param name="errorHandler">     to call for asynchronous errors.</param>
+            <param name="recordingSignalConsumer"> for consuming interleaved recording signals on the control session.</param>
+            <param name="controlSessionId"> to filter the responses. </param>
+            <param name="fragmentLimit">    to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.Subscription">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.RecordingDescriptorPoller.Subscription"/> used for polling responses.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.RecordingDescriptorPoller.Subscription"/> used for polling responses. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.Poll">
+            <summary>
+            Poll for recording events.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.ControlSessionId">
+            <summary>
+            Control session id for filtering responses.
+            </summary>
+            <returns> control session id for filtering responses. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.IsDispatchComplete">
+            <summary>
+            Is the dispatch of descriptors complete?
+            </summary>
+            <returns> true if the dispatch of descriptors complete? </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.RemainingRecordCount">
+            <summary>
+            Get the number of remaining records are expected.
+            </summary>
+            <returns> the number of remaining records are expected. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.Reset(System.Int64,System.Int32,Adaptive.Archiver.IRecordingDescriptorConsumer)">
+            <summary>
+            Reset the poller to dispatch the descriptors returned from a query.
+            </summary>
+            <param name="correlationId"> for the response. </param>
+            <param name="recordCount">           of descriptors to expect. </param>
+            <param name="consumer">              to which the recording descriptors are to be dispatched. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingDescriptorPoller.ToString">
+            <inheritdoc />
+        </member>
+        <member name="T:Adaptive.Archiver.RecordingEventsAdapter">
+            <summary>
+            Encapsulate the polling, decoding, and dispatching of recording events.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsAdapter.#ctor(Adaptive.Archiver.IRecordingEventsListener,Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Create an adapter for a given subscription to an archive for recording events.
+            </summary>
+            <param name="listener">      to which events are dispatched. </param>
+            <param name="subscription">  to poll for new events. </param>
+            <param name="fragmentLimit"> to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsAdapter.Poll">
+            <summary>
+            Poll for recording events and dispatch them to the <seealso cref="T:Adaptive.Archiver.IRecordingEventsListener"/> for this instance.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsAdapter.OnFragment(Adaptive.Agrona.IDirectBuffer,System.Int32,System.Int32,Adaptive.Aeron.LogBuffer.Header)">
+            <inheritdoc />
+        </member>
+        <member name="T:Adaptive.Archiver.RecordingEventsPoller">
+            <summary>
+            Encapsulate the polling and decoding of recording events.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.#ctor(Adaptive.Aeron.Subscription)">
+            <summary>
+            Create a poller for a given subscription to an archive for recording events.
+            </summary>
+            <param name="subscription"> to poll for new events. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.Poll">
+            <summary>
+            Poll for recording events.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.IsPollComplete">
+            <summary>
+            Has the last polling action received a complete message?
+            </summary>
+            <returns> true of the last polling action received a complete message? </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.TemplateId">
+            <summary>
+            Get the template id of the last received message.
+            </summary>
+            <returns> the template id of the last received message. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.RecordingId">
+            <summary>
+            Get the recording id of the last received event.
+            </summary>
+            <returns> the recording id of the last received event. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.RecordingStartPosition">
+            <summary>
+            Get the position the recording started at.
+            </summary>
+            <returns> the position the recording started at. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.RecordingPosition">
+            <summary>
+            Get the current recording position.
+            </summary>
+            <returns> the current recording position. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingEventsPoller.RecordingStopPosition">
+            <summary>
+            Get the position the recording stopped at.
+            </summary>
+            <returns> the position the recording stopped at. </returns>
+        </member>
+        <member name="T:Adaptive.Archiver.RecordingPos">
+             <summary>
+             The position a recording has reached when being archived.
+            
+             Key has the following layout:
+            
+               0                   1                   2                   3
+               0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+              +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+              |                        Recording ID                           |
+              |                                                               |
+              +---------------------------------------------------------------+
+              |                         Session ID                            |
+              +---------------------------------------------------------------+
+              |                Source Identity for the Image                  |
+              |                                                              ...
+             ...                                                              |
+              +---------------------------------------------------------------+
+             
+             </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.RecordingPos.RECORDING_POSITION_TYPE_ID">
+            <summary>
+            Type id of a recording position counter.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.RecordingPos.NULL_RECORDING_ID">
+            <summary>
+            Represents a null recording id when not found.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.RecordingPos.NAME">
+            <summary>
+            Human-readable name for the counter.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingPos.FindCounterIdByRecording(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int64)">
+            <summary>
+            Find the active counter id for a stream based on the recording id.
+            </summary>
+            <param name="countersReader"> to search within. </param>
+            <param name="recordingId">    for the active recording. </param>
+            <returns> the counter id if found otherwise <seealso cref="F:Adaptive.Agrona.Concurrent.Status.CountersReader.NULL_COUNTER_ID"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingPos.FindCounterIdBySession(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32)">
+            <summary>
+            Find the active counter id for a stream based on the session id.
+            </summary>
+            <param name="countersReader"> to search within. </param>
+            <param name="sessionId">      for the active recording. </param>
+            <returns> the counter id if found otherwise <seealso cref="F:Adaptive.Agrona.Concurrent.Status.CountersReader.NULL_COUNTER_ID"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingPos.GetRecordingId(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32)">
+            <summary>
+            Get the recording id for a given counter id.
+            </summary>
+            <param name="countersReader"> to search within. </param>
+            <param name="counterId">      for the active recording. </param>
+            <returns> the counter id if found otherwise <seealso cref="F:Adaptive.Archiver.RecordingPos.NULL_RECORDING_ID"/>. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingPos.GetSourceIdentity(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32)">
+            <summary>
+            Get the <seealso cref="P:Adaptive.Aeron.Image.SourceIdentity"/> for the recording.
+            </summary>
+            <param name="counters"> to search within. </param>
+            <param name="counterId"> for the active recording. </param>
+            <returns> <seealso cref="P:Adaptive.Aeron.Image.SourceIdentity"/> for the recording or null if not found. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingPos.IsActive(Adaptive.Agrona.Concurrent.Status.CountersReader,System.Int32,System.Int64)">
+            <summary>
+            Is the recording counter still active.
+            </summary>
+            <param name="counters"> to search within. </param>
+            <param name="counterId">   to search for. </param>
+            <param name="recordingId"> to confirm it is still the same value. </param>
+            <returns> true if the counter is still active otherwise false. </returns>
+        </member>
+        <member name="T:Adaptive.Archiver.RecordingSignalAdapter">
+            <summary>
+            Encapsulate the polling, decoding, and dispatching of recording transition events for a session plus the
+            asynchronous events to check for errors.
+            </summary>
+            <seealso cref="T:Adaptive.Archiver.Codecs.RecordingSignal"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalAdapter.#ctor(System.Int64,Adaptive.Archiver.IControlEventListener,Adaptive.Archiver.IRecordingSignalConsumer,Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Create an adapter for a given subscription to an archive for recording events.
+            </summary>
+            <param name="controlSessionId">            to listen for associated asynchronous control events, such as errors. </param>
+            <param name="controlEventListener">        listener for control events which may indicate an error on the session. </param>
+            <param name="recordingSignalConsumer"> consumer of recording transition events. </param>
+            <param name="subscription">                to poll for new events. </param>
+            <param name="fragmentLimit">               to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalAdapter.Poll">
+            <summary>
+            Poll for recording transitions and dispatch them to the <seealso cref="T:Adaptive.Archiver.IRecordingSignalConsumer"/> for this instance,
+            plus check for async responses for this control session which may have an exception and dispatch to the
+            <seealso cref="T:Adaptive.Archiver.IControlResponseListener"/>.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="P:Adaptive.Archiver.RecordingSignalAdapter.Done">
+            <summary>
+            Indicate that poll was successful and a signal or control response was received.
+            </summary>
+            <returns> true if a signal or control response was received. </returns>
+        </member>
+        <member name="T:Adaptive.Archiver.IRecordingSignalConsumer">
+            <summary>
+            Consumer of signals representing operations applied to a recording.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.IRecordingSignalConsumer.OnSignal(System.Int64,System.Int64,System.Int64,System.Int64,System.Int64,Adaptive.Archiver.Codecs.RecordingSignal)">
+            <summary>
+            Signal of operation taken on a recording.
+            </summary>
+            <param name="controlSessionId"> that initiated the operation. </param>
+            <param name="correlationId">    that initiated the operation, could be the replication id. </param>
+            <param name="recordingId">      which has signalled. </param>
+            <param name="subscriptionId">   of the <see cref="T:Adaptive.Aeron.Subscription"/> associated with the recording. </param>
+            <param name="position">         of the recorded stream at the point of signal. </param>
+            <param name="signal">           type of the operation applied to the recording. </param>
+        </member>
+        <member name="T:Adaptive.Archiver.RecordingSignalPoller">
+            <summary>
+            Encapsulate the polling and decoding of archive control protocol response and recording signal messages.
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.RecordingSignalPoller.FRAGMENT_LIMIT">
+            <summary>
+            Limit to apply when polling messages.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.#ctor(System.Int64,Adaptive.Aeron.Subscription,System.Int32)">
+            <summary>
+            Create a poller for a given subscription to an archive for control messages.
+            </summary>
+            <param name="controlSessionId"> to listen for associated asynchronous control events, such as errors. </param>
+            <param name="subscription">     to poll for new events. </param>
+            <param name="fragmentLimit">    to apply when polling. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.#ctor(System.Int64,Adaptive.Aeron.Subscription)">
+            <summary>
+            Create a poller for a given subscription to an archive for control response messages with a default
+            fragment limit for polling as <seealso cref="F:Adaptive.Archiver.RecordingSignalPoller.FRAGMENT_LIMIT"/>.
+            </summary>
+            <param name="controlSessionId"> to listen for associated asynchronous control events, such as errors. </param>
+            <param name="subscription"> to poll for new events. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.Subscription">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.RecordingSignalPoller.Subscription"/> used for polling messages.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.RecordingSignalPoller.Subscription"/> used for polling messages. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.Poll">
+            <summary>
+            Poll for control response events.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.ControlSessionId">
+            <summary>
+            Control session id of the last polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> control session id of the last polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.CorrelationId">
+            <summary>
+            Correlation id of the last polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing.
+            </summary>
+            <returns> correlation id of the last polled message or <seealso cref="F:Adaptive.Aeron.Aeron.NULL_VALUE"/> if poll returned nothing. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.RelevantId">
+            <summary>
+            Get the relevant id returned with the response, e.g. replay session id.
+            </summary>
+            <returns> the relevant id returned with the response. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.TemplateId">
+            <summary>
+            Get the template id of the last received message.
+            </summary>
+            <returns> the template id of the last received message. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.RecordingId">
+            <summary>
+            Get the recording id of the last received message.
+            </summary>
+            <returns> the recording id of the last received message. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.RecordingSubscriptionId">
+            <summary>
+            Get the recording subscription id of the last received message.
+            </summary>
+            <returns> the recording subscription id of the last received message. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.RecordingPosition">
+            <summary>
+            Get the recording position of the last received message.
+            </summary>
+            <returns> the recording position of the last received message. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.RecordingSignal">
+            <summary>
+            Get the recording signal of the last received message.
+            </summary>
+            <returns> the recording signal of the last received message. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.Version">
+            <summary>
+            Version response from the server in semantic version form.
+            </summary>
+            <returns> response from the server in semantic version form. </returns>
+        </member>
+        <member name="P:Adaptive.Archiver.RecordingSignalPoller.PollComplete">
+            <summary>
+            Has the last polling action received a complete message?
+            </summary>
+            <returns> true if the last polling action received a complete message? </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.Code">
+            <summary>
+            Get the response code of the last response.
+            </summary>
+            <returns> the response code of the last response. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.ErrorMessage">
+            <summary>
+            Get the error message of the last response.
+            </summary>
+            <returns> the error message of the last response. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSignalPoller.ToString">
+            <summary>
+            {@inheritDoc}
+            </summary>
+        </member>
+        <member name="T:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller">
+            <summary>
+            Encapsulate the polling, decoding, dispatching of recording descriptors from an archive.
+            </summary>
+            <seealso cref="T:Adaptive.Archiver.IRecordingSubscriptionDescriptorConsumer"></seealso>
+            <seealso cref="M:Adaptive.Archiver.ArchiveProxy.ListRecordingSubscriptions(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,System.Int64,System.Int64)"></seealso>
+            <seealso cref="M:Adaptive.Archiver.AeronArchive.ListRecordingSubscriptions(System.Int32,System.Int32,System.String,System.Int32,System.Boolean,Adaptive.Archiver.IRecordingSubscriptionDescriptorConsumer)"></seealso>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.#ctor(Adaptive.Aeron.Subscription,Adaptive.Agrona.ErrorHandler,System.Int64,System.Int32)">
+            <summary>
+            Create a poller for a given subscription to an archive for control response messages.
+            </summary>
+            <param name="subscription">     to poll for new events. </param>
+            <param name="errorHandler">     to call for asynchronous errors. </param>
+            <param name="controlSessionId"> to filter the responses. </param>
+            <param name="fragmentLimit">    to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.#ctor(Adaptive.Aeron.Subscription,Adaptive.Agrona.ErrorHandler,Adaptive.Archiver.IRecordingSignalConsumer,System.Int64,System.Int32)">
+            <summary>
+            Create a poller for a given subscription to an archive for control response messages.
+            </summary>
+            <param name="subscription">     to poll for new events. </param>
+            <param name="errorHandler">     to call for asynchronous errors. </param>
+            <param name="recordingSignalConsumer">  for consuming interleaved recording signals on the control session.</param>
+            <param name="controlSessionId"> to filter the responses. </param>
+            <param name="fragmentLimit">    to apply for each polling operation. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.Subscription">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.Subscription"/> used for polling responses.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.Subscription"/> used for polling responses. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.Poll">
+            <summary>
+            Poll for recording subscriptions and delegate to the <seealso cref="T:Adaptive.Archiver.IRecordingSubscriptionDescriptorConsumer"/>.
+            </summary>
+            <returns> the number of fragments read during the operation. Zero if no events are available. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.ControlSessionId">
+            <summary>
+            Control session id for filtering responses.
+            </summary>
+            <returns> control session id for filtering responses. </returns>
+        </member>
+        <member name="P:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.DispatchComplete">
+            <summary>
+            Is the dispatch of descriptors complete?
+            </summary>
+            <returns> true if the dispatch of descriptors complete? </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.RemainingSubscriptionCount">
+            <summary>
+            Get the number of remaining subscriptions expected.
+            </summary>
+            <returns> the number of remaining subscriptions expected. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.RecordingSubscriptionDescriptorPoller.Reset(System.Int64,System.Int32,Adaptive.Archiver.IRecordingSubscriptionDescriptorConsumer)">
+            <summary>
+            Reset the poller to dispatch the descriptors returned from a query.
+            </summary>
+            <param name="correlationId">     for the response. </param>
+            <param name="subscriptionCount"> of descriptors to expect. </param>
+            <param name="consumer">          to which the recording subscription descriptors are to be dispatched. </param>
+        </member>
+        <member name="T:Adaptive.Archiver.ReplayMerge">
+            <summary>
+            Replay a recorded stream from a starting position and merge with live stream for a full history of a stream.
+            <para>
+            Once constructed either of <seealso cref="M:Adaptive.Archiver.ReplayMerge.Poll(Adaptive.Aeron.LogBuffer.FragmentHandler,System.Int32)"/> or <seealso cref="M:Adaptive.Archiver.ReplayMerge.DoWork"/>, interleaved with consumption
+            of the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Image"/>, should be called in a duty cycle loop until <seealso cref="P:Adaptive.Archiver.ReplayMerge.Merged"/> is {@code true}.
+            After which the <seealso cref="T:Adaptive.Archiver.ReplayMerge"/> can be closed and continued usage can be made of the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Image"/> or its
+            parent <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/>. If an exception occurs or progress stops, the merge will fail and
+            <seealso cref="M:Adaptive.Archiver.ReplayMerge.HasFailed"/> will be {@code true}.
+            </para>
+            <para>
+            If the endpoint on the replay destination uses a port of 0, then the OS will assign a port from the ephemeral
+            range and this will be added to the replay channel for instructing the archive.
+            </para>
+            <para>
+            NOTE: Merging is only supported with UDP streams.
+            </para>
+            </summary>
+        </member>
+        <member name="F:Adaptive.Archiver.ReplayMerge.LIVE_ADD_MAX_WINDOW">
+            <summary>
+            The maximum window at which a live destination should be added when trying to merge.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.#ctor(Adaptive.Aeron.Subscription,Adaptive.Archiver.AeronArchive,System.String,System.String,System.String,System.Int64,System.Int64,Adaptive.Agrona.Concurrent.IEpochClock,System.Int64)">
+            <summary>
+            Create a <seealso cref="T:Adaptive.Archiver.ReplayMerge"/> to manage the merging of a replayed stream and switching over to live stream as
+            appropriate.
+            </summary>
+            <param name="subscription">           to use for the replay and live stream. Must be a multi-destination subscription. </param>
+            <param name="archive">                to use for the replay. </param>
+            <param name="replayChannel">          to as a template for what the archive will use. </param>
+            <param name="replayDestination">      to send the replay to and the destination added by the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/>. </param>
+            <param name="liveDestination">        for the live stream and the destination added by the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/>. </param>
+            <param name="recordingId">            for the replay. </param>
+            <param name="startPosition">          for the replay. </param>
+            <param name="epochClock">             to use for progress checks. </param>
+            <param name="mergeProgressTimeoutMs"> to use for progress checks. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.#ctor(Adaptive.Aeron.Subscription,Adaptive.Archiver.AeronArchive,System.String,System.String,System.String,System.Int64,System.Int64)">
+            <summary>
+            Create a <seealso cref="T:Adaptive.Archiver.ReplayMerge"/> to manage the merging of a replayed stream and switching over to live stream as
+            appropriate.
+            </summary>
+            <param name="subscription">      to use for the replay and live stream. Must be a multi-destination subscription. </param>
+            <param name="archive">           to use for the replay. </param>
+            <param name="replayChannel">     to use as a template for what the archive will use. </param>
+            <param name="replayDestination"> to send the replay to and the destination added by the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/>. </param>
+            <param name="liveDestination">   for the live stream and the destination added by the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/>. </param>
+            <param name="recordingId">       for the replay. </param>
+            <param name="startPosition">     for the replay. </param>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.Dispose">
+            <summary>
+            Close and stop any active replay. Will remove the replay destination from the subscription.
+            This operation Will NOT remove the live destination if it has been added, so it can be used for live consumption.
+            </summary>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.Subscription">
+            <summary>
+            Get the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/> used to consume the replayed and merged stream.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/> used to consume the replayed and merged stream. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.DoWork">
+            <summary>
+            Perform the work of replaying and merging. Should only be used if polling the underlying <seealso cref="M:Adaptive.Archiver.ReplayMerge.Image"/> directly,
+            call <seealso cref="M:Adaptive.Archiver.ReplayMerge.Poll(Adaptive.Aeron.LogBuffer.FragmentHandler,System.Int32)"/> on this class.
+            </summary>
+            <returns> indication of work done processing the merge. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.Poll(Adaptive.Aeron.LogBuffer.FragmentHandler,System.Int32)">
+            <summary>
+            Poll the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Image"/> used for replay and merging and live stream. The <seealso cref="M:Adaptive.Archiver.ReplayMerge.DoWork"/> method
+            will be called before the poll so that processing of the merge can be done.
+            </summary>
+            <param name="fragmentHandler"> to call for fragments. </param>
+            <param name="fragmentLimit">   for poll call. </param>
+            <returns> number of fragments processed. </returns>
+        </member>
+        <member name="P:Adaptive.Archiver.ReplayMerge.Merged">
+            <summary>
+            Is the live stream merged and the replay stopped?
+            </summary>
+            <returns> true if live stream is merged and the replay stopped or false if not. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.HasFailed">
+            <summary>
+            Has the replay merge failed due to an error?
+            </summary>
+            <returns> true if replay merge has failed due to an error. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.Image">
+            <summary>
+            The <seealso cref="M:Adaptive.Archiver.ReplayMerge.Image"/> which is a merge of the replay and live stream.
+            </summary>
+            <returns> the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Image"/> which is a merge of the replay and live stream. </returns>
+        </member>
+        <member name="P:Adaptive.Archiver.ReplayMerge.LiveAdded">
+            <summary>
+            Is the live destination added to the <seealso cref="M:Adaptive.Archiver.ReplayMerge.Subscription"/>?
+            </summary>
+            <returns> true if live destination added or false if not. </returns>
+        </member>
+        <member name="M:Adaptive.Archiver.ReplayMerge.ToString">
+            <summary>
+            {@inheritDoc}
+            </summary>
+        </member>
+    </members>
+</doc>

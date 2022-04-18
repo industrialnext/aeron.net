@@ -1,0 +1,193 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.0/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.0": {},
+    ".NETStandard,Version=v2.0/": {
+      "Adaptive.Aeron.Samples.Common/1.0.0": {
+        "dependencies": {
+          "Aeron.Client": "1.37.0",
+          "Agrona": "1.37.0",
+          "HardwareInformation": "5.0.0",
+          "NETStandard.Library": "2.0.3"
+        },
+        "runtime": {
+          "Adaptive.Aeron.Samples.Common.dll": {}
+        }
+      },
+      "HardwareInformation/5.0.0": {
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "5.0.0-rc.2.20475.5",
+          "System.Diagnostics.PerformanceCounter": "4.7.0",
+          "System.Management": "4.7.0",
+          "VulkanSharp": "0.1.10"
+        },
+        "runtime": {
+          "lib/netstandard2.0/HardwareInformation.dll": {
+            "assemblyVersion": "4.0.1.0",
+            "fileVersion": "4.0.1.0"
+          }
+        }
+      },
+      "Microsoft.Extensions.Logging.Abstractions/5.0.0-rc.2.20475.5": {
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.Extensions.Logging.Abstractions.dll": {
+            "assemblyVersion": "5.0.0.0",
+            "fileVersion": "5.0.20.47505"
+          }
+        }
+      },
+      "Microsoft.NETCore.Platforms/1.1.0": {},
+      "NETStandard.Library/2.0.3": {
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "System.CodeDom/4.7.0": {
+        "runtime": {
+          "lib/netstandard2.0/System.CodeDom.dll": {
+            "assemblyVersion": "4.0.3.0",
+            "fileVersion": "4.700.19.56404"
+          }
+        }
+      },
+      "System.Diagnostics.PerformanceCounter/4.7.0": {
+        "runtime": {
+          "lib/netstandard2.0/System.Diagnostics.PerformanceCounter.dll": {
+            "assemblyVersion": "4.0.2.0",
+            "fileVersion": "4.700.19.56404"
+          }
+        }
+      },
+      "System.Management/4.7.0": {
+        "dependencies": {
+          "System.CodeDom": "4.7.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/System.Management.dll": {
+            "assemblyVersion": "4.0.1.0",
+            "fileVersion": "4.700.19.56404"
+          }
+        }
+      },
+      "System.Runtime.CompilerServices.Unsafe/6.0.0": {
+        "runtime": {
+          "lib/netstandard2.0/System.Runtime.CompilerServices.Unsafe.dll": {
+            "assemblyVersion": "6.0.0.0",
+            "fileVersion": "6.0.21.52210"
+          }
+        }
+      },
+      "VulkanSharp/0.1.10": {
+        "dependencies": {
+          "NETStandard.Library": "2.0.3"
+        },
+        "runtime": {
+          "lib/netstandard1.1/Vulkan.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Aeron.Client/1.37.0": {
+        "dependencies": {
+          "Agrona": "1.37.0"
+        },
+        "runtime": {
+          "Adaptive.Aeron.dll": {}
+        }
+      },
+      "Agrona/1.37.0": {
+        "dependencies": {
+          "System.Runtime.CompilerServices.Unsafe": "6.0.0"
+        },
+        "runtime": {
+          "Adaptive.Agrona.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Adaptive.Aeron.Samples.Common/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "HardwareInformation/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-uaf9FHjabZ5RFzpfHObTIIa6HCcmTxus6PHZW5tlMDQsLiyEPQE9dX/YxMUGh599Q7J+sXQF5yhzHC68WdF95w==",
+      "path": "hardwareinformation/5.0.0",
+      "hashPath": "hardwareinformation.5.0.0.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Logging.Abstractions/5.0.0-rc.2.20475.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-qcrbNFa0B5scnXkjOElPChw45O3oB6spesQwxpp0RZgm0869HXFaNOwXAn8eMfjJ/mm2ZhanK6WQMxyd0gpCLg==",
+      "path": "microsoft.extensions.logging.abstractions/5.0.0-rc.2.20475.5",
+      "hashPath": "microsoft.extensions.logging.abstractions.5.0.0-rc.2.20475.5.nupkg.sha512"
+    },
+    "Microsoft.NETCore.Platforms/1.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-kz0PEW2lhqygehI/d6XsPCQzD7ff7gUJaVGPVETX611eadGsA3A877GdSlU0LRVMCTH/+P3o2iDTak+S08V2+A==",
+      "path": "microsoft.netcore.platforms/1.1.0",
+      "hashPath": "microsoft.netcore.platforms.1.1.0.nupkg.sha512"
+    },
+    "NETStandard.Library/2.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-st47PosZSHrjECdjeIzZQbzivYBJFv6P2nv4cj2ypdI204DO+vZ7l5raGMiX4eXMJ53RfOIg+/s4DHVZ54Nu2A==",
+      "path": "netstandard.library/2.0.3",
+      "hashPath": "netstandard.library.2.0.3.nupkg.sha512"
+    },
+    "System.CodeDom/4.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Hs9pw/kmvH3lXaZ1LFKj3pLQsiGfj2xo3sxSzwiLlRL6UcMZUTeCfoJ9Udalvn3yq5dLlPEZzYegrTQ1/LhPOQ==",
+      "path": "system.codedom/4.7.0",
+      "hashPath": "system.codedom.4.7.0.nupkg.sha512"
+    },
+    "System.Diagnostics.PerformanceCounter/4.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-kE9szT4i3TYT9bDE/BPfzg9/BL6enMiZlcUmnUEBrhRtxWvurKoa8qhXkLTRhrxMzBqaDleWlRfIPE02tulU+w==",
+      "path": "system.diagnostics.performancecounter/4.7.0",
+      "hashPath": "system.diagnostics.performancecounter.4.7.0.nupkg.sha512"
+    },
+    "System.Management/4.7.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IY+uuGhgzWiCg21i8IvQeY/Z7m1tX8VuPF+ludfn7iTCaccTtJo5HkjZbBEL8kbBubKhAKKtNXr7uMtmAc28Pw==",
+      "path": "system.management/4.7.0",
+      "hashPath": "system.management.4.7.0.nupkg.sha512"
+    },
+    "System.Runtime.CompilerServices.Unsafe/6.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/iUeP3tq1S0XdNNoMz5C9twLSrM/TH+qElHkXWaPvuNOt+99G75NrV0OS2EqHx5wMN7popYjpc8oTjC1y16DLg==",
+      "path": "system.runtime.compilerservices.unsafe/6.0.0",
+      "hashPath": "system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
+    },
+    "VulkanSharp/0.1.10": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-nlOLAnnbMrPf3QxqWy8FC9tUKCCNO2+wRhUKyCpWRzd387e1npd9GTSVCSZQDhDhLwHjtq/IWQrfoHwLJUeufw==",
+      "path": "vulkansharp/0.1.10",
+      "hashPath": "vulkansharp.0.1.10.nupkg.sha512"
+    },
+    "Aeron.Client/1.37.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Agrona/1.37.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
