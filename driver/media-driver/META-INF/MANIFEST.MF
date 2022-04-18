@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Implementation-Title: Aeron
+Automatic-Module-Name: io.aeron.all
+Implementation-Version: 1.37.0
+Implementation-Vendor: Real Logic Limited
+

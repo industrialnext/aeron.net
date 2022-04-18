@@ -10,6 +10,7 @@
         "dependencies": {
           "Adaptive.Agrona.Tests": "1.0.0",
           "Aeron.Client": "1.37.0",
+          "Aeron.Driver": "1.37.0",
           "Agrona": "1.37.0",
           "FakeItEasy": "7.2.0",
           "Microsoft.NET.Test.Sdk": "17.0.0",
@@ -20,6 +21,7 @@
           "Adaptive.Aeron.Tests.dll": {}
         }
       },
+      "Aeron.Driver/1.37.0": {},
       "Castle.Core/4.3.1": {
         "dependencies": {
           "NETStandard.Library": "2.0.0",
@@ -782,6 +784,7 @@
       },
       "Adaptive.Agrona.Tests/1.0.0": {
         "dependencies": {
+          "Aeron.Driver": "1.37.0",
           "Agrona": "1.37.0",
           "FakeItEasy": "7.2.0",
           "Microsoft.NET.Test.Sdk": "17.0.0",
@@ -794,6 +797,7 @@
       },
       "Aeron.Client/1.37.0": {
         "dependencies": {
+          "Aeron.Driver": "1.37.0",
           "Agrona": "1.37.0"
         },
         "runtime": {
@@ -802,6 +806,7 @@
       },
       "Agrona/1.37.0": {
         "dependencies": {
+          "Aeron.Driver": "1.37.0",
           "System.Runtime.CompilerServices.Unsafe": "6.0.0"
         },
         "runtime": {
@@ -815,6 +820,13 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "Aeron.Driver/1.37.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-agMeHts1fNRt4cSoogRLiyy8+DZjJtl2Sup/0IeEWgYDaljTyn6dKn7BDjBTCxKqyv/qJIA7MD2UCutJfT7nxw==",
+      "path": "aeron.driver/1.37.0",
+      "hashPath": "aeron.driver.1.37.0.nupkg.sha512"
     },
     "Castle.Core/4.3.1": {
       "type": "package",

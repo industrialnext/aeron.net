@@ -8,7 +8,6 @@ C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\bin\Debug\netcore
 C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\bin\Debug\netcoreapp3.1\Adaptive.Agrona.dll
 C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\bin\Debug\netcoreapp3.1\Adaptive.Agrona.pdb
 C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\bin\Debug\netcoreapp3.1\Adaptive.Agrona.xml
-C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\obj\Debug\netcoreapp3.1\Adaptive.Agrona.PerformanceTest.csproj.AssemblyReference.cache
 C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\obj\Debug\netcoreapp3.1\Adaptive.Agrona.PerformanceTest.GeneratedMSBuildEditorConfig.editorconfig
 C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\obj\Debug\netcoreapp3.1\Adaptive.Agrona.PerformanceTest.AssemblyInfoInputs.cache
 C:\Davidp\Aeron.NET-master\src\Adaptive.Agrona.PerformanceTest\obj\Debug\netcoreapp3.1\Adaptive.Agrona.PerformanceTest.AssemblyInfo.cs
