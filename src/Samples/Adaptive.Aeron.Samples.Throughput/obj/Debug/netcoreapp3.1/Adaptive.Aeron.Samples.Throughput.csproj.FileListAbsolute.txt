@@ -32,6 +32,7 @@ C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\bin\Deb
 C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\bin\Debug\netcoreapp3.1\Adaptive.Aeron.xml
 C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\bin\Debug\netcoreapp3.1\Adaptive.Agrona.pdb
 C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\bin\Debug\netcoreapp3.1\Adaptive.Agrona.xml
+C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\obj\Debug\netcoreapp3.1\Adaptive.Aeron.Samples.Throughput.csproj.AssemblyReference.cache
 C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\obj\Debug\netcoreapp3.1\Adaptive.Aeron.Samples.Throughput.GeneratedMSBuildEditorConfig.editorconfig
 C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\obj\Debug\netcoreapp3.1\Adaptive.Aeron.Samples.Throughput.AssemblyInfoInputs.cache
 C:\Davidp\Aeron.NET-master\src\Samples\Adaptive.Aeron.Samples.Throughput\obj\Debug\netcoreapp3.1\Adaptive.Aeron.Samples.Throughput.AssemblyInfo.cs

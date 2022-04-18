@@ -8,12 +8,14 @@
     ".NETCoreApp,Version=v3.1": {
       "Adaptive.Aeron.Samples.ClusterClient/1.0.0": {
         "dependencies": {
-          "Aeron.Cluster": "1.37.0"
+          "Aeron.Cluster": "1.37.0",
+          "Aeron.Driver": "1.37.0"
         },
         "runtime": {
           "Adaptive.Aeron.Samples.ClusterClient.dll": {}
         }
       },
+      "Aeron.Driver/1.37.0": {},
       "System.Runtime.CompilerServices.Unsafe/6.0.0": {
         "runtime": {
           "lib/netcoreapp3.1/System.Runtime.CompilerServices.Unsafe.dll": {
@@ -24,7 +26,8 @@
       },
       "Aeron.Archiver/1.37.0": {
         "dependencies": {
-          "Aeron.Client": "1.37.0"
+          "Aeron.Client": "1.37.0",
+          "Aeron.Driver": "1.37.0"
         },
         "runtime": {
           "Adaptive.Archiver.dll": {}
@@ -32,6 +35,7 @@
       },
       "Aeron.Client/1.37.0": {
         "dependencies": {
+          "Aeron.Driver": "1.37.0",
           "Agrona": "1.37.0"
         },
         "runtime": {
@@ -41,7 +45,8 @@
       "Aeron.Cluster/1.37.0": {
         "dependencies": {
           "Aeron.Archiver": "1.37.0",
-          "Aeron.Client": "1.37.0"
+          "Aeron.Client": "1.37.0",
+          "Aeron.Driver": "1.37.0"
         },
         "runtime": {
           "Adaptive.Cluster.dll": {}
@@ -49,6 +54,7 @@
       },
       "Agrona/1.37.0": {
         "dependencies": {
+          "Aeron.Driver": "1.37.0",
           "System.Runtime.CompilerServices.Unsafe": "6.0.0"
         },
         "runtime": {
@@ -62,6 +68,13 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "Aeron.Driver/1.37.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-agMeHts1fNRt4cSoogRLiyy8+DZjJtl2Sup/0IeEWgYDaljTyn6dKn7BDjBTCxKqyv/qJIA7MD2UCutJfT7nxw==",
+      "path": "aeron.driver/1.37.0",
+      "hashPath": "aeron.driver.1.37.0.nupkg.sha512"
     },
     "System.Runtime.CompilerServices.Unsafe/6.0.0": {
       "type": "package",
